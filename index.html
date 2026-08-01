@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sparked Matter LLC | From Edge to Action</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --navy:       #0D1B2A;
+            --navy-mid:   #162336;
+            --copper:     #C96A1F;
+            --copper-lt:  #E07B39;
+            --steel:      #4A6FA5;
+            --light:      #F6F7F9;
+            --white:      #FFFFFF;
+            --text:       #1A2332;
+            --muted:      #5A6A7A;
+            --border:     #E0E4EA;
+            --mono: 'Courier New', Courier, monospace;
+            --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            font-family: var(--sans);
+            color: var(--text);
+            background: var(--light);
+            line-height: 1.65;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            background: var(--navy);
+            color: #fff;
+            padding: 72px 32px 88px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background:
+                radial-gradient(ellipse at 15% 60%, rgba(201,106,31,.18) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 10%, rgba(74,111,165,.25) 0%, transparent 45%);
+            pointer-events: none;
+        }
+
+        .hero-inner {
+            max-width: 1140px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-eyebrow {
+            font-family: var(--mono);
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--copper-lt);
+            display: block;
+            margin-bottom: 22px;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.2rem, 5.5vw, 3.8rem);
+            font-weight: 800;
+            line-height: 1.08;
+            letter-spacing: -.025em;
+            margin-bottom: 22px;
+        }
+
+        .hero h1 em {
+            font-style: normal;
+            color: var(--copper-lt);
+        }
+
+        .hero-sub {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,.72);
+            max-width: 620px;
+            margin-bottom: 38px;
+            line-height: 1.55;
+        }
+
+        .hero-cta {
+            display: inline-block;
+            background: var(--copper);
+            color: #fff;
+            text-decoration: none;
+            padding: 13px 30px;
+            font-weight: 700;
+            font-size: .9rem;
+            letter-spacing: .04em;
+            transition: background .18s;
+        }
+        .hero-cta:hover { background: var(--copper-lt); }
+
+        /* ── LAYOUT WRAPPER ── */
+        .wrap {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+
+        section {
+            padding: 60px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        section:last-of-type { border-bottom: none; }
+
+        /* ── LABELS & HEADINGS ── */
+        .eyebrow {
+            font-family: var(--mono);
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--copper);
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        h2 {
+            font-size: 2.1rem;
+            font-weight: 800;
+            color: var(--navy);
+            letter-spacing: -.02em;
+            margin-bottom: 14px;
+        }
+
+        .lead {
+            color: var(--muted);
+            font-size: 1.15rem;
+            max-width: 680px;
+            margin-bottom: 0;
+        }
+
+        /* ── TRINITY ── */
+        .trinity {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            margin-top: 36px;
+        }
+
+        .trinity-card {
+            background: var(--white);
+            padding: 34px 28px 36px;
+        }
+
+        .trinity-icon {
+            font-size: 1.7rem;
+            display: block;
+            margin-bottom: 14px;
+        }
+
+        .trinity-card h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 9px;
+        }
+
+        .trinity-card p {
+            font-size: .98rem;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        /* ── SERVICES ── */
+        .service {
+            display: grid;
+            grid-template-columns: 160px 1fr 130px;
+            align-items: start;
+            gap: 24px;
+            padding: 30px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .service:last-child { border-bottom: none; }
+
+        .svc-type {
+            font-family: var(--mono);
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: var(--copper);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            padding-top: 3px;
+        }
+
+        .svc-body h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 6px;
+        }
+
+        .svc-body p {
+            font-size: .98rem;
+            color: var(--muted);
+        }
+
+        .svc-price {
+            font-family: var(--mono);
+            font-size: .98rem;
+            color: var(--navy);
+            font-weight: 600;
+            text-align: right;
+            padding-top: 3px;
+        }
+
+        /* ── FOCUS AREAS ── */
+        .focus-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 36px;
+        }
+
+        .focus-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            padding: 28px 24px;
+        }
+
+        .focus-tag {
+            font-family: var(--mono);
+            font-size: .98rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--copper);
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .focus-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 9px;
+        }
+
+        .focus-card p {
+            font-size: .93rem;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        /* ── CREDENTIALS ── */
+        .cred-hl {
+            background: var(--navy);
+            color: #fff;
+            padding: 28px 32px;
+            margin-top: 36px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .cred-stat .num {
+            font-family: var(--mono);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--copper-lt);
+            display: block;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .cred-stat .label {
+            font-size: .82rem;
+            color: rgba(255,255,255,.55);
+            text-transform: uppercase;
+            letter-spacing: .1em;
+        }
+
+        .archive-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        .archive-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            padding: 22px 20px;
+        }
+
+        .archive-card strong {
+            font-family: var(--mono);
+            font-size: .95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--navy);
+            display: block;
+            margin-bottom: 9px;
+        }
+
+        .archive-card p {
+            font-size: .92rem;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 12px 26px;
+            border: 2px solid var(--navy);
+            color: var(--navy);
+            text-decoration: none;
+            font-size: .92rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            transition: all .18s;
+        }
+        .download-btn:hover { background: var(--navy); color: #fff; }
+
+        /* ── CONTACT SECTION ── */
+        .contact-section {
+            background: var(--navy);
+            padding: 64px 24px;
+        }
+
+        .contact-inner {
+            max-width: 1140px;
+            margin: 0 auto;
+        }
+
+        .contact-inner h2 { color: #fff; }
+        .contact-inner > p { color: rgba(255,255,255,.58); margin-bottom: 36px; max-width: 560px; font-size: 1.05rem; }
+
+        .contact-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            align-items: start;
+        }
+
+        .contact-links a {
+            display: block;
+            color: rgba(255,255,255,.78);
+            text-decoration: none;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            transition: color .16s;
+        }
+        .contact-links a:hover { color: var(--copper-lt); }
+
+        /* compliance */
+        .compliance {
+            background: rgba(255,255,255,.055);
+            border: 1px solid rgba(255,255,255,.1);
+            padding: 18px;
+        }
+
+        .compliance-title {
+            font-family: var(--mono);
+            font-size: .64rem;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.5);
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .opt-label {
+            display: flex;
+            gap: 9px;
+            align-items: flex-start;
+            color: rgba(255,255,255,.52);
+            font-size: .72rem;
+            line-height: 1.45;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .opt-label input { margin-top: 2px; flex-shrink: 0; }
+
+        .init-btn {
+            background: var(--copper);
+            color: #fff;
+            border: none;
+            padding: 9px 20px;
+            font-family: var(--mono);
+            font-size: .68rem;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background .18s;
+        }
+        .init-btn:hover { background: var(--copper-lt); }
+
+        .compliance-note {
+            margin-top: 10px;
+            font-size: .63rem;
+            color: rgba(255,255,255,.3);
+            line-height: 1.4;
+        }
+
+        .compliance-note a { color: rgba(255,255,255,.4); }
+
+        /* ── FOOTER ── */
+        footer {
+            background: var(--navy);
+            border-top: 1px solid rgba(255,255,255,.07);
+            text-align: center;
+            padding: 24px;
+        }
+
+        .policy-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 8px;
+        }
+
+        .policy-links a {
+            color: rgba(255,255,255,.35);
+            font-size: .72rem;
+            text-decoration: none;
+            transition: color .16s;
+        }
+        .policy-links a:hover { color: var(--copper-lt); }
+
+        footer p {
+            color: rgba(255,255,255,.25);
+            font-size: .72rem;
+        }
+
+        .integration-block {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--copper);
+            padding: 34px 32px;
+            margin-top: 24px;
+        }
+
+        .integration-block h3 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--navy);
+            margin-bottom: 14px;
+            letter-spacing: -.01em;
+        }
+
+        .integration-block p {
+            font-size: 1rem;
+            color: var(--muted);
+            line-height: 1.65;
+            margin-bottom: 14px;
+        }
+
+        .integration-block .integration-close {
+            font-family: var(--mono);
+            font-size: .95rem;
+            color: var(--navy);
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) {
+            .trinity { grid-template-columns: 1fr 1fr; }
+            .focus-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 640px) {
+            .hero { padding: 52px 20px 68px; }
+            .trinity { grid-template-columns: 1fr; }
+            .focus-grid { grid-template-columns: 1fr; }
+            .archive-grid { grid-template-columns: 1fr; }
+            .cred-hl { grid-template-columns: 1fr; gap: 16px; }
+            .service { grid-template-columns: 1fr; gap: 4px; }
+            .svc-price { text-align: left; }
+            .contact-cols { grid-template-columns: 1fr; gap: 28px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<header class="hero">
+    <div class="hero-inner">
+        <span class="hero-eyebrow">⚡ Sparked Matter LLC &nbsp;·&nbsp; St. Petersburg, FL</span>
+        <h1>Hands-On Hardware.<br><em>Open Source Intelligence.</em></h1>
+        <p class="hero-sub">From Raytheon phased arrays to Jetson Nano edge AI — decades of real engineering, now supercharged with open source AI. No vendor lock-in. No black boxes. Real builds.</p>
+        <a href="mailto:info@sparkedmatter.com" class="hero-cta">Let's Spark Something</a>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <!-- ═══ TRINITY ═══ -->
+    <section>
+        <span class="eyebrow">The Foundation</span>
+        <h2>The Trinity of Creation</h2>
+        <p class="lead">Three meanings. One mission. Everything Sparked Matter does lives at the intersection of all three.</p>
+
+        <div class="trinity">
+            <div class="trinity-card">
+                <span class="trinity-icon">🔥</span>
+                <h3>It Matters</h3>
+                <p>We only take on problems worth solving — ones with real stakes for real people and industries.</p>
+            </div>
+            <div class="trinity-card">
+                <span class="trinity-icon">💡</span>
+                <h3>Subject Matter</h3>
+                <p>30+ years of engineering depth across power, defense, enterprise, and edge AI. The breadth backs up the brainstorm.</p>
+            </div>
+            <div class="trinity-card">
+                <span class="trinity-icon">⚡</span>
+                <h3>Physical Matter</h3>
+                <p>From idea to hardware. We don't just consult — we wire, test, and build things that work in the real world.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ SERVICES ═══ -->
+    <section>
+        <span class="eyebrow">The Offer</span>
+        <h2>Geek on Tap 🍻</h2>
+        <p class="lead">A personal trainer for ideas and engineering problems. Start with coffee. Scale from there.</p>
+
+        <div style="margin-top: 32px;">
+            <div class="service">
+                <span class="svc-type">☕ Coffee Chat</span>
+                <div class="svc-body">
+                    <h3>Brainstorm Session</h3>
+                    <p>Bring your problem, your idea, or your pain point. We'll think together and find the angle nobody else sees.</p>
+                </div>
+                <span class="svc-price">$100–150</span>
+            </div>
+
+            <div class="service">
+                <span class="svc-type">🛠 Workshop Day</span>
+                <div class="svc-body">
+                    <h3>Prototype &amp; Solve</h3>
+                    <p>A full day of focused engineering. Tackle a real problem and walk away with something tangible.</p>
+                </div>
+                <span class="svc-price">$500</span>
+            </div>
+
+            <div class="service">
+                <span class="svc-type">🤝 Retainer</span>
+                <div class="svc-body">
+                    <h3>Ongoing Sounding Board</h3>
+                    <p>Old-school engineering wisdom meets new-school AI thinking — on call when you need it, not when you don't.</p>
+                </div>
+                <span class="svc-price">Let's talk</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ FOCUS AREAS ═══ -->
+    <section>
+        <span class="eyebrow">Where We Work</span>
+        <h2>Built for the Industries That Build Things</h2>
+        <p class="lead">Specialized focus on sectors where hardware meets software — and where open source can unlock real freedom.</p>
+
+        <div class="focus-grid">
+            <div class="focus-card">
+                <span class="focus-tag">Marine</span>
+                <h3>Power &amp; Instrumentation</h3>
+                <p>Victron systems, NMEA 2000, and CAN bus integration. Solar, LiFePO₄, inverters, and instrumentation that talk to each other — and to you.</p>
+            </div>
+            <div class="focus-card">
+                <span class="focus-tag">Agriculture</span>
+                <h3>Field Tech &amp; Right to Repair</h3>
+                <p>J1939 CAN bus systems, tractor diagnostics, and equipment liberation from proprietary lock-out.</p>
+            </div>
+            <div class="focus-card">
+                <span class="focus-tag">Edge AI</span>
+                <h3>Hardware Intelligence</h3>
+                <p>Jetson Nano, Raspberry Pi, and custom edge builds with open source AI. No cloud dependency required.</p>
+            </div>
+        </div>
+
+        <div class="integration-block">
+            <span class="focus-tag">Systems Integration</span>
+            <h3>Designed in Tools You Own Outright</h3>
+            <p>Marine power and instrumentation built end to end — Victron GX and Venus OS, NMEA 2000 and CAN bus, LiFePO₄ banks, solar, and inverter systems, bridged so your batteries, charge controllers, and chartplotter all speak the same language.</p>
+            <p>The engineering happens in open tooling: FreeCAD for hull, structure, conduit runs, and cable harnesses; KiCad for custom control boards; Raspberry Pi and Jetson for edge compute when the job calls for it. Every model, schematic, and script is yours — no per-seat licenses, no vendor lock-in, no black box you can't automate around.</p>
+            <p class="integration-close">From edge to action. Hands on the hardware, not just advice on a slide.</p>
+        </div>
+    </section>
+
+    <!-- ═══ CREDENTIALS ═══ -->
+    <section>
+        <span class="eyebrow">The Archive</span>
+        <h2>Engineering That Goes All the Way Back</h2>
+        <p class="lead">From military phased arrays to enterprise carrier networks to 517,000 miles of road — this is the depth behind the brainstorm.</p>
+
+        <div class="cred-hl">
+            <div class="cred-stat">
+                <span class="num">30+</span>
+                <span class="label">Years of Engineering</span>
+            </div>
+            <div class="cred-stat">
+                <span class="num">517K</span>
+                <span class="label">OTR Flatbed Miles</span>
+            </div>
+            <div class="cred-stat">
+                <span class="num">6+</span>
+                <span class="label">Industries Served</span>
+            </div>
+        </div>
+
+        <div class="archive-grid">
+            <div class="archive-card">
+                <strong>Defense &amp; Hardware</strong>
+                <p>Raytheon (E-Systems) — phased array military antennas, ASIC development, RF troubleshooting, electronic design.</p>
+            </div>
+            <div class="archive-card">
+                <strong>Power &amp; Excitation</strong>
+                <p>Basler Electric — AVR, DECS systems, protective relays, synchronous motor control across Latin America &amp; Caribbean.</p>
+            </div>
+            <div class="archive-card">
+                <strong>Enterprise &amp; Networks</strong>
+                <p>AT&amp;T, Verizon, VeriSign, GE, Ceridian — 3rd level support, 1300-node campus networks, load balancing, EDI systems.</p>
+            </div>
+            <div class="archive-card">
+                <strong>Edge AI &amp; Automation</strong>
+                <p>LabVIEW/cRIO, FIRST Robotics mentorship, Jetson Nano, GStreamer audio pipelines, AI agent architecture.</p>
+            </div>
+            <div class="archive-card">
+                <strong>Multinational Sales &amp; GIS</strong>
+                <p>GE account growth $194K → $1.3M (2008). Tranztek — 3D terrain mapping introduced to Codelco, world's largest copper mine.</p>
+            </div>
+            <div class="archive-card">
+                <strong>Road &amp; Logistics</strong>
+                <p>CDL Class A — 517,341 flatbed miles with Melton and Mercer. Predictive ETA modeling, heavy freight coordination.</p>
+            </div>
+        </div>
+
+        <a href="/New_Profile.pdf" class="download-btn">↓ Download Full Profile</a>
+    </section>
+
+</div><!-- /wrap -->
+
+<!-- ═══ CONTACT ═══ -->
+<div class="contact-section">
+    <div class="contact-inner">
+        <h2>From Edge to Action.</h2>
+        <p>Based in St. Petersburg, FL. Serving marine, agriculture, and technology industries across Florida and beyond. Bilingual — English &amp; Spanish.</p>
+
+        <div class="contact-cols">
+            <div class="contact-links">
+                <a href="https://www.linkedin.com/in/sparkedmatterllc" target="_blank">↗ LinkedIn — Sparked Matter LLC</a>
+                <a href="mailto:info@sparkedmatter.com">info@sparkedmatter.com</a>
+                <a href="tel:+18133340414">(813) 334-0414</a>
+                <a href="tel:+18136076219">(813) 607-6219</a>
+            </div>
+
+            <div class="compliance">
+                <span class="compliance-title">SMS Opt-In</span>
+                <form action="#" onsubmit="this.querySelector('.init-btn').textContent='Consent Recorded ✓'; this.querySelector('.init-btn').style.background='#27ae60'; return false;">
+                    <label class="opt-label">
+                        <input type="checkbox" required>
+                        I agree to receive SMS messages from Sparked Matter LLC. Message and data rates may apply. Reply STOP to opt out.
+                    </label>
+                    <button type="submit" class="init-btn">Initialize Connection</button>
+                </form>
+                <p class="compliance-note">
+                    Mobile info will not be shared with third parties for marketing purposes.<br>
+                    <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+    <div class="policy-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+    </div>
+    <p>&copy; 2026 Sparked Matter LLC &nbsp;·&nbsp; St. Petersburg, FL &nbsp;·&nbsp; "From Edge to Action"</p>
+</footer>
+
+</body>
+</html>
