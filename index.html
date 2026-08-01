@@ -701,23 +701,39 @@
 
         <div class="contact-cols">
             <div class="contact-links">
+                <a href="https://cal.com/sparkedmatter" target="_blank" class="init-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:18px;">📅 Book a Coffee Chat</a>
+                <a href="tel:+18133340414">📞 (813) 334-0414</a>
+                <a href="tel:+18136076219">📞 (813) 607-6219</a>
+                <a href="mailto:info@sparkedmatter.com">✉ info@sparkedmatter.com</a>
                 <a href="https://www.linkedin.com/in/sparkedmatterllc" target="_blank">↗ LinkedIn — Sparked Matter LLC</a>
-                <a href="mailto:info@sparkedmatter.com">info@sparkedmatter.com</a>
-                <a href="tel:+18133340414">(813) 334-0414</a>
-                <a href="tel:+18136076219">(813) 607-6219</a>
             </div>
 
             <div class="compliance">
-                <span class="compliance-title">SMS Opt-In</span>
-                <form action="#" onsubmit="this.querySelector('.init-btn').textContent='Consent Recorded ✓'; this.querySelector('.init-btn').style.background='#27ae60'; return false;">
-                    <label class="opt-label">
-                        <input type="checkbox" required>
-                        I agree to receive SMS messages from Sparked Matter LLC. Message and data rates may apply. Reply STOP to opt out.
-                    </label>
-                    <button type="submit" class="init-btn">Initialize Connection</button>
+                <span class="compliance-title">Tell Me What You're Building</span>
+                <div data-fs-success style="display:none;padding:14px;background:#e8f6ec;border-left:4px solid #27ae60;margin-bottom:12px;color:#1a1a1a;">
+                    Thanks — message received. I'll get back to you shortly.
+                </div>
+                <div data-fs-error style="color:#c0392b;margin-bottom:10px;"></div>
+                <form id="contact-form">
+                    <input type="text" name="name" placeholder="Name" data-fs-field required
+                           style="width:100%;padding:10px;margin-bottom:4px;border:1px solid var(--border);font-family:inherit;">
+                    <span data-fs-error="name" style="color:#c0392b;font-size:.85rem;"></span>
+                    <input type="email" name="email" placeholder="Email" data-fs-field required
+                           style="width:100%;padding:10px;margin-bottom:4px;border:1px solid var(--border);font-family:inherit;">
+                    <span data-fs-error="email" style="color:#c0392b;font-size:.85rem;"></span>
+                    <input type="tel" name="phone" placeholder="Phone (optional)" data-fs-field
+                           style="width:100%;padding:10px;margin-bottom:4px;border:1px solid var(--border);font-family:inherit;">
+                    <textarea name="message" rows="3" placeholder="What are you working on?" data-fs-field required
+                           style="width:100%;padding:10px;margin-bottom:4px;border:1px solid var(--border);font-family:inherit;"></textarea>
+                    <span data-fs-error="message" style="color:#c0392b;font-size:.85rem;"></span>
+                    <button type="submit" class="init-btn" data-fs-submit-btn>Send</button>
                 </form>
+                <script>
+                  window.formspree = window.formspree || function () { (formspree.q = formspree.q || []).push(arguments); };
+                  formspree('initForm', { formElement: '#contact-form', formId: 'mzdnlbwn' });
+                </script>
+                <script src="https://unpkg.com/@formspree/ajax@1" defer></script>
                 <p class="compliance-note">
-                    Mobile info will not be shared with third parties for marketing purposes.<br>
                     <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
                 </p>
             </div>
