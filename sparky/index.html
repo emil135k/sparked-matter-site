@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sparky Dance Rig</title>
+<meta name="description" content="Pose and choreograph Sparky, the Sparked Matter dancing stick figure, on an 8-count timeline.">
+<meta name="theme-color" content="#070c15">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sparky">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a neon stage on the left (top on phones), a mixing-desk of body controls on the right, an 8-count timeline under the stage. */
+:root {
+  --bg: #070c15; --panel: #0d1522; --line: #1d2a3d; --ink: #e6edf5; --muted: #8796ab;
+  --teal: #5fd3c4; --gold: #f0c060; --coral: #ee7a6e; --sky: #58b4e6;
+  --display: "Fredoka", "Nunito Sans", system-ui, sans-serif;
+  --body: "Nunito Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px; }
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.app > .panel { position: sticky; top: env(safe-area-inset-top, 0px); max-height: calc(100vh - 28px); }
+header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 28px; margin: 0; letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--teal), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tag { color: var(--muted); }
+.left { display: grid; grid-template-rows: 58vh auto auto; gap: 12px; min-width: 0; min-height: 0; }
+.stage { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(ellipse at 50% 70%, #0f2a2e 0%, var(--bg) 70%); min-height: 320px; }
+#c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.views { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
+.hint { position: absolute; bottom: 10px; left: 12px; color: var(--muted); font-size: 12px; }
+.countnow { position: absolute; top: 10px; right: 12px; font-family: var(--mono); font-size: 22px; color: var(--gold); }
+button, select, input[type=number] { font-family: var(--body); font-size: 13px; color: var(--ink); background: #132033;
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+button { cursor: pointer; font-weight: 600; }
+button:hover { border-color: var(--teal); }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button.primary { background: var(--teal); color: #04201c; border-color: var(--teal); }
+button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); }
+.timeline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; }
+.trow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.slots { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; }
+.slot { padding: 8px 0; text-align: center; font-family: var(--mono); font-size: 12px; border-radius: 6px;
+  background: #0f1a2a; border: 1px solid var(--line); color: var(--muted); }
+.slot.and { font-size: 10px; }
+.slot.filled { background: #12333a; color: var(--teal); border-color: #1f5a5e; }
+.slot.sel { outline: 2px solid var(--gold); color: var(--ink); }
+.slot.play { background: var(--gold); color: #2a1d00; }
+.small { color: var(--muted); font-size: 12px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; overflow-y: auto; min-height: 0; display: grid; gap: 12px; align-content: start; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 10px; margin: 0; display: grid; gap: 6px; }
+legend { font-family: var(--display); font-size: 15px; padding: 0 6px; }
+legend.hips { color: var(--teal); } legend.sh { color: var(--teal); } legend.arm { color: var(--gold); } legend.leg { color: var(--sky); } legend.head { color: var(--coral); }
+.ctl { display: grid; grid-template-columns: 96px minmax(0, 1fr) 42px; align-items: center; gap: 8px; }
+.ctl label { color: var(--muted); font-size: 12px; }
+.ctl output { font-family: var(--mono); font-size: 11px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--teal); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font-family: var(--mono); font-size: 11px; padding: 8px; }
+.scoretitle { font-family: var(--display); font-size: 16px; color: var(--gold); }
+#staff { width: 100%; height: 170px; display: block; }
+.gridwrap { overflow-x: auto; }
+.gridwrap table { border-collapse: collapse; font-family: var(--mono); font-size: 11px; min-width: 760px; width: 100%; }
+.gridwrap th, .gridwrap td { border: 1px solid var(--line); padding: 3px 4px; text-align: center; }
+.gridwrap th[scope=row] { text-align: left; font-family: var(--body); color: var(--muted); white-space: nowrap; }
+.gridwrap td { color: var(--teal); }
+.gridwrap td.same { color: #3b5a66; }
+.gridwrap td.hold { color: var(--muted); }
+.gridwrap td.face { font-family: var(--body); color: var(--coral); font-size: 10px; }
+.ewv, .ewh { display: block; line-height: 1.15; }
+.ewv { border-bottom: 1px solid currentColor; }
+.toast { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--teal); color: #04201c; padding: 8px 14px; border-radius: 999px; font-weight: 700; }
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .left { grid-template-rows: 58vh auto auto; }
+  .app > .panel { position: static; max-height: none; }
+  .slots { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .panel { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.mixrow { display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: 12px; color: var(--muted, #8796ab); }
+.mixrow button { flex: none; }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header>
+    <h1>Sparky Dance Rig</h1>
+    <span class="tag">Pose the Sparked Matter dancer in 3D, save poses on the counts, press play.</span>
+  </header>
+
+  <div class="left">
+    <div class="stage">
+      <canvas id="c" aria-label="3D dancer stage. Drag to orbit, scroll to zoom."></canvas>
+      <div class="views">
+        <button data-view="front">Front</button><button data-view="three">¾</button><button data-view="side">Side</button>
+      </div>
+      <div class="countnow" id="countNow">1</div>
+      <div class="hint">Drag to spin · pinch or scroll to zoom · two fingers (or shift-drag) to pan up/down · gold dot = center of gravity (floor dot turns coral when he'd tip over)</div>
+    </div>
+
+    <div class="timeline">
+      <div class="trow">
+        <button class="primary" id="play">▶ Play</button>
+        <button id="metro" class="on">Click track</button>
+        <button id="groove" class="on">Auto bounce</button>
+        <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" style="width:72px">
+        <span class="small" id="status">Sample routine loaded: 8 counts.</span>
+      </div>
+      <div class="slots" id="slots"></div>
+      <div class="trow">
+        <button id="savePose">Save again</button>
+        <button id="clearPose">Clear count</button>
+        <button id="clearAll">New routine</button>
+        <button id="copyCard">Copy dance card</button>
+      </div>
+    </div>
+
+    <div class="timeline score">
+      <div class="trow">
+        <strong class="scoretitle">Score</strong>
+        <button data-score="staff" class="on">Stick staff</button>
+        <button data-score="grid">Limb grid</button>
+        <button id="copyBvh">Copy BVH</button>
+        <span class="small">Stick staff after Sutton DanceWriting. Limb grid in Eshkol-Wachman positions, 1 = 45°: top number is vertical (0 down, 4 up), bottom is horizontal (0 = front, clockwise from above).</span>
+      </div>
+      <canvas id="staff" aria-label="Stick-figure staff of the saved counts"></canvas>
+      <div id="grid" class="gridwrap" hidden></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <fieldset><legend class="head">Face &amp; quick poses</legend>
+      <div class="ctl"><label for="face">Face</label>
+        <select id="face" style="grid-column: span 2">
+          <option value="smile">😊 Smile</option><option value="dreamy">😌 Eyes closed</option><option value="smug">😏 Smug wink</option>
+          <option value="laugh">😆 Laugh</option><option value="ooh">😮 Ooh</option><option value="focus">😛 Focused</option><option value="love">😍 Heart eyes</option>
+        </select></div>
+      <div class="presets" id="presets"></div>
+      <div class="mixrow"><button id="mixBtn" class="on" aria-pressed="true">Mix moves</button>
+        <span>On: each quick pose only changes the parts it uses, so you can stack them (legs first, then arms). Neutral starts over.</span></div>
+    </fieldset>
+    <div id="controls"></div>
+    <fieldset><legend>Paste a dance card</legend>
+      <textarea id="cardIn" placeholder="Paste a dance card here to load it."></textarea>
+      <button id="loadCard">Load dance card</button>
+    </fieldset>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="./three.min.js"></script>
+<script>
+(() => {
+const D2R = Math.PI / 180;
+// ---------- controls ----------
+const GROUPS = [
+  { name: "Hips", cls: "hips", ctl: [
+    ["hx", "Slide", -0.3, 0.3, 0.01, 0], ["hz", "Pop fwd/back", -0.2, 0.2, 0.01, 0],
+    ["hy", "Knee dip", 0, 0.55, 0.01, 0.03], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
+    ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.13] ] },
+  { name: "Spine", cls: "hips", ctl: [
+    ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
+  { name: "Shoulders", cls: "sh", ctl: [
+    ["syaw", "Twist", -50, 50, 1, 0], ["sroll", "Tilt", -25, 25, 1, 0],
+    ["shL", "Shrug left", 0, 0.12, 0.005, 0], ["shR", "Shrug right", 0, 0.12, 0.005, 0] ] },
+  { name: "Head & neck", cls: "head", ctl: [
+    ["htn", "Turn", -60, 60, 1, 0], ["htl", "Tilt", -30, 30, 1, 0], ["hnd", "Nod", -25, 25, 1, 0], ["lookL", "Eyes on L hand", 0, 1, 0.05, 0], ["lookR", "Eyes on R hand", 0, 1, 0.05, 0],
+    ["nkx", "Neck slide", -0.07, 0.07, 0.005, 0], ["nkz", "Neck peck", -0.06, 0.07, 0.005, 0] ] },
+  { name: "Left arm", cls: "arm", ctl: [
+    ["aLr", "Raise", 0, 175, 1, 25], ["aLs", "Swing fwd", -60, 170, 1, 0], ["aLb", "Elbow", -20, 160, 1, 40], ["aLf", "Forearm fwd", -60, 120, 1, 0], ["aLw", "Wrist", -80, 80, 1, 0] ] },
+  { name: "Right arm", cls: "arm", ctl: [
+    ["aRr", "Raise", 0, 175, 1, 25], ["aRs", "Swing fwd", -60, 170, 1, 0], ["aRb", "Elbow", -20, 160, 1, 40], ["aRf", "Forearm fwd", -60, 120, 1, 0], ["aRw", "Wrist", -80, 80, 1, 0] ] },
+  { name: "Legs & feet", cls: "leg", ctl: [
+    ["fLx", "Left step", -0.25, 0.25, 0.01, 0], ["fRx", "Right step", -0.25, 0.25, 0.01, 0],
+    ["fLy", "Left lift", 0, 0.3, 0.01, 0], ["fRy", "Right lift", 0, 0.3, 0.01, 0], ["fz", "Step fwd/back", -0.25, 0.25, 0.01, 0],
+    ["kL", "Left knee up", 0, 1, 0.02, 0], ["kR", "Right knee up", 0, 1, 0.02, 0], ["bal", "Auto balance", 0, 1, 0.05, 0] ] },
+];
+const DEF = {}; GROUPS.forEach(g => g.ctl.forEach(c => DEF[c[0]] = c[5]));
+let P = { ...DEF, face: "smile" };
+const inputs = {};
+const controls = document.getElementById("controls");
+GROUPS.forEach(g => {
+  const fs = document.createElement("fieldset");
+  fs.innerHTML = `<legend class="${g.cls}">${g.name}</legend>`;
+  g.ctl.forEach(([k, label, mn, mx, st]) => {
+    const row = document.createElement("div"); row.className = "ctl";
+    row.innerHTML = `<label for="c_${k}">${label}</label><input type="range" id="c_${k}" min="${mn}" max="${mx}" step="${st}"><output id="o_${k}"></output>`;
+    fs.appendChild(row);
+    const inp = row.querySelector("input"); inputs[k] = inp;
+    inp.addEventListener("input", () => { P[k] = parseFloat(inp.value); showVal(k); stopPlay(); liveSave(); });
+  });
+  controls.appendChild(fs);
+});
+const DIST = new Set(["lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
+function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; }
+const faceSel = document.getElementById("face");
+faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.face); liveSave(); });
+// whatever you change is written into the count you have selected, so Play always shows your latest edit
+let liveT;
+function sameBody(hw) { slots.forEach(s => { if (s) s.hw = hw; }); }
+function unifyBody() {            // older routines may have mixed widths: keep the one that was changed from the default
+  const c = slots.find(s => s && Math.abs((s.hw ?? 0.13) - 0.13) > 1e-3); const hw = c ? c.hw : 0.13;
+  sameBody(hw); P.hw = hw; return hw;
+}
+function liveSave() {
+  slots[sel] = { ...P }; sameBody(P.hw); paintSlots();
+  setStatus(`Editing ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}. Changes save automatically.`);
+  clearTimeout(liveT); liveT = setTimeout(persist, 200);
+}
+
+// mirror a pose left <-> right: swap the L/R controls and flip the sideways ones
+const SWAP = [["aLr", "aRr"], ["aLs", "aRs"], ["aLb", "aRb"], ["aLf", "aRf"], ["aLw", "aRw"], ["shL", "shR"], ["fLy", "fRy"], ["kL", "kR"], ["lookL", "lookR"]];
+const FLIP = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx"];
+function mirror(o) {
+  const m = { ...o };
+  SWAP.forEach(([a, b]) => { m[a] = o[b]; m[b] = o[a]; if (m[a] === undefined) delete m[a]; if (m[b] === undefined) delete m[b]; });
+  FLIP.forEach(k => { if (o[k] !== undefined) m[k] = -o[k]; });
+  if (o.fLx !== undefined || o.fRx !== undefined) { m.fLx = -(o.fRx || 0); m.fRx = -(o.fLx || 0); }
+  return m;
+}
+// right arm points up and out, eyes follow the hand: head turns toward it and tips back to look up
+const DISCO_R = { aRr: 145, aRs: 30, aRb: 8, aLr: 40, aLb: 120, aLf: 30, hx: -0.12, hroll: 10, sb: -6, lookR: 1, htl: 6, face: "smug" };
+// hip swing: hips slide and twist to one side while the shoulders stay put
+const SWING_L = { hx: 0.1, hroll: 9, hyaw: 22, syaw: -8 };
+const PRESETS = {
+  "Neutral": {},
+  "Hip pop L": { hx: -0.18, hroll: 12, sb: -8, sroll: -6, aLr: 35, aRr: 35, aLb: 70, aRb: 70, fLx: -0.06, hy: 0.06 },
+  "Hip pop R": { hx: 0.18, hroll: -12, sb: 8, sroll: 6, aLr: 35, aRr: 35, aLb: 70, aRb: 70, fRx: 0.06, hy: 0.06 },
+  "Shimmy": { syaw: 25, shL: 0.06, aLr: 60, aRr: 60, aLb: 60, aRb: 60, aLf: 40, aRf: 40, face: "smug" },
+  "Body roll": { sl: 20, hz: -0.06, hnd: -10, aLr: 40, aRr: 40, aLb: 50, aRb: 50, face: "dreamy" },
+  "Jazz hands": { aLr: 80, aRr: 80, aLb: 95, aRb: 95, aLw: 20, aRw: 20, face: "ooh" },
+  "Disco point R": DISCO_R,
+  "Disco point L": mirror(DISCO_R),
+  "Heart": { aLr: 150, aRr: 150, aLb: 120, aRb: 120, aLw: 40, aRw: 40, face: "love" },
+  "Neck slide L": { nkx: -0.06, aLr: 90, aRr: 90, aLb: 90, aRb: 90, aLw: 30, aRw: 30, face: "smug" },
+  "Neck slide R": { nkx: 0.06, aLr: 90, aRr: 90, aLb: 90, aRb: 90, aLw: 30, aRw: 30, face: "smug" },
+  "Chicken peck": { nkz: 0.06, sl: 8, aLr: 45, aRr: 45, aLb: 120, aRb: 120, aLs: -30, aRs: -30, face: "focus" },
+  "Lean back": { sl: -26, hnd: -15, hz: 0.06, aLr: 60, aRr: 60, aLs: -20, aRs: -20, face: "laugh" },
+  "Side curve": { sb: 30, htl: 12, hx: -0.08, aRr: 160, aRb: 20, aLr: 20, face: "dreamy" },
+  "Balance L": { kR: 0.9, bal: 1, hy: 0.06, hroll: -6, sb: 4, aLr: 70, aRr: 70, aLb: 30, aRb: 30, htl: -5, face: "focus" },
+  "Balance R": { kL: 0.9, bal: 1, hy: 0.06, hroll: 6, sb: -4, aLr: 70, aRr: 70, aLb: 30, aRb: 30, htl: 5, face: "focus" },
+  "Get down": { hy: 0.42, hz: -0.07, sl: 22, hnd: -10 },
+  "Stand up": { hy: 0.03, hz: 0, sl: 0, hnd: 0 },
+  "Swing hips L": SWING_L,
+  "Swing hips R": mirror(SWING_L),
+  "Knee pop": { fLy: 0.18, fLx: 0.05, hx: 0.06, hy: 0.08, aLr: 30, aRr: 30, aLs: 50, aRs: -30, face: "focus" },
+};
+const presetBox = document.getElementById("presets");
+let mix = true;
+document.getElementById("mixBtn").addEventListener("click", e => { mix = !mix; e.target.classList.toggle("on", mix); e.target.setAttribute("aria-pressed", mix);
+  e.target.nextElementSibling.textContent = mix ? "On: each quick pose only changes the parts it uses, so you can stack them (legs first, then arms). Neutral starts over." : "Off: each quick pose replaces the whole body."; });
+Object.keys(PRESETS).forEach(n => { const b = document.createElement("button"); b.textContent = n;
+  b.addEventListener("click", () => { stopPlay(); P = (mix && n !== "Neutral") ? { ...P, ...PRESETS[n] } : { ...DEF, face: "smile", ...PRESETS[n], hw: P.hw }; syncUI(); drawFace(P.face); liveSave(); }); presetBox.appendChild(b); });
+
+// ---------- 3D ----------
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+let az = 0.35, el = 0.12, dist = 4.4; const target = new THREE.Vector3(0, 1.0, 0);
+function placeCam() { camera.position.set(target.x + dist * Math.sin(az) * Math.cos(el), target.y + dist * Math.sin(el), target.z + dist * Math.cos(az) * Math.cos(el)); camera.lookAt(target); }
+function resize() { const r = canvas.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(canvas.parentElement);
+// orbit
+let drag = null, pinch = null; const ptrs = new Map();
+const clampDist = d => Math.max(1.2, Math.min(8, d));
+const clampTy = y => Math.max(0.1, Math.min(2.0, y));
+function midY() { const [a, b] = [...ptrs.values()]; return (a.y + b.y) / 2; }
+function panK() { return dist * 0.8 / Math.max(200, canvas.clientHeight); }
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+function gap() { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; }
+canvas.addEventListener("pointerdown", e => {
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
+  if (ptrs.size === 2) { drag = null; pinch = { d0: gap(), dist0: dist, my0: midY(), ty0: target.y }; }
+  else if (ptrs.size === 1) { drag = { x: e.clientX, y: e.clientY, az, el, ty0: target.y, pan: e.button === 2 || e.shiftKey }; canvas.style.cursor = drag.pan ? "ns-resize" : "grabbing"; }
+});
+canvas.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && ptrs.size >= 2) { dist = clampDist(pinch.dist0 * pinch.d0 / gap()); target.y = clampTy(pinch.ty0 + (midY() - pinch.my0) * panK()); return; }
+  if (!drag) return;
+  if (drag.pan) { target.y = clampTy(drag.ty0 + (e.clientY - drag.y) * panK()); return; }
+  az = drag.az - (e.clientX - drag.x) * 0.008; el = Math.max(-0.2, Math.min(1.2, drag.el + (e.clientY - drag.y) * 0.006));
+});
+function ptrEnd(e) {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (ptrs.size === 1) { const p = [...ptrs.values()][0]; drag = { x: p.x, y: p.y, az, el, ty0: target.y, pan: false }; }
+  if (ptrs.size === 0) { drag = null; canvas.style.cursor = "grab"; }
+}
+canvas.addEventListener("pointerup", ptrEnd); canvas.addEventListener("pointercancel", ptrEnd);
+canvas.addEventListener("gesturestart", e => e.preventDefault());
+canvas.addEventListener("wheel", e => { e.preventDefault(); dist = clampDist(dist * (1 + e.deltaY * 0.001)); }, { passive: false });
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.view; az = v === "front" ? 0 : v === "side" ? Math.PI / 2 : 0.6; el = 0.12; target.y = 1.0; dist = 4.4; }));
+
+// floor
+const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.MeshBasicMaterial({ color: 0x0b1a24, transparent: true, opacity: 0.85 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const rings = [];
+for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.0, 64), new THREE.MeshBasicMaterial({ color: 0xf0c060, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  r.rotation.x = -Math.PI / 2; r.position.y = 0.003; scene.add(r); rings.push(r); }
+const grid = new THREE.Mesh(new THREE.RingGeometry(1.55, 1.58, 64), new THREE.MeshBasicMaterial({ color: 0x5fd3c4, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+grid.rotation.x = -Math.PI / 2; grid.position.y = 0.002; scene.add(grid);
+// floating cubes
+const cubes = [];
+for (let i = 0; i < 18; i++) {
+  const s = 0.06 + Math.random() * 0.1;
+  const m = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, s)),
+    new THREE.LineBasicMaterial({ color: [0x5fd3c4, 0x58b4e6, 0xf0c060, 0xee7a6e][i % 4], transparent: true, opacity: 0.35 }));
+  const a = Math.random() * Math.PI * 2, r = 1.8 + Math.random() * 1.6;
+  m.position.set(Math.cos(a) * r, 0.3 + Math.random() * 2.2, Math.sin(a) * r - 0.5); m.userData = { sp: 0.2 + Math.random() * 0.6, y0: m.position.y, ph: Math.random() * 6 };
+  scene.add(m); cubes.push(m);
+}
+// segment pool
+const CYL = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true);
+const SPH = new THREE.SphereGeometry(1, 20, 14);
+function glowMat(c, o) { return new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }); }
+const COL = { teal: 0x5fd3c4, gold: 0xf0c060, sky: 0x58b4e6, coral: 0xee7a6e };
+const segs = [];
+function makeSeg(color) {
+  const core = new THREE.Mesh(CYL, new THREE.MeshBasicMaterial({ color }));
+  const glow = new THREE.Mesh(CYL, glowMat(color, 0.18));
+  const capA = new THREE.Mesh(SPH, new THREE.MeshBasicMaterial({ color }));
+  scene.add(core, glow, capA); return { core, glow, capA };
+}
+const UP = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3();
+function setSeg(s, a, b, r) {
+  tmp.subVectors(b, a); const len = tmp.length();
+  for (const [m, rr] of [[s.core, r], [s.glow, r * 2.8]]) {
+    m.position.copy(a).addScaledVector(tmp, 0.5); m.scale.set(rr, len, rr);
+    m.quaternion.setFromUnitVectors(UP, tmp.clone().normalize());
+  }
+  s.capA.position.copy(a); s.capA.scale.setScalar(r * 1.05);
+}
+const S = {}; ["shoulders", "hips"].forEach(k => S[k] = makeSeg(COL.teal));
+// spine + neck: one smooth tube through the joints (Catmull-Rom), so bends read as curves, not broken sticks
+const SPINE_PTS = Array.from({ length: 7 }, (_, i) => new THREE.Vector3(0, 1 + i * 0.12, 0));
+const spineCurve = new THREE.CatmullRomCurve3(SPINE_PTS, false, "centripetal");
+const TUBE_SEG = 48, TUBE_RAD = 12;
+function makeTube(r, mat) { const m = new THREE.Mesh(new THREE.TubeGeometry(spineCurve, TUBE_SEG, r, TUBE_RAD, false), mat); m.frustumCulled = false; m.userData.r = r; scene.add(m); return m; }
+const spineCore = makeTube(0.022, new THREE.MeshBasicMaterial({ color: COL.teal }));
+const spineGlow = makeTube(0.022 * 2.8, glowMat(COL.teal, 0.18));
+const spineCapLow = new THREE.Mesh(SPH, new THREE.MeshBasicMaterial({ color: COL.teal })); spineCapLow.scale.setScalar(0.022); scene.add(spineCapLow);
+function setSpine(pts) {
+  pts.forEach((v, i) => SPINE_PTS[i].copy(v)); spineCurve.updateArcLengths && spineCurve.updateArcLengths();
+  for (const m of [spineCore, spineGlow]) {
+    const ng = new THREE.TubeGeometry(spineCurve, TUBE_SEG, m.userData.r, TUBE_RAD, false);
+    m.geometry.attributes.position.array.set(ng.attributes.position.array); m.geometry.attributes.position.needsUpdate = true; ng.dispose();
+  }
+  spineCapLow.position.copy(pts[0]);
+}
+["uaL", "faL", "hdL", "uaR", "faR", "hdR"].forEach(k => S[k] = makeSeg(COL.gold));
+["thL", "shinL", "ftL", "thR", "shinR", "ftR"].forEach(k => S[k] = makeSeg(COL.sky));
+// center-of-gravity marker
+const comDot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 12), new THREE.MeshBasicMaterial({ color: COL.gold }));
+const comShadow = new THREE.Mesh(new THREE.CircleGeometry(0.05, 28), new THREE.MeshBasicMaterial({ color: COL.teal, transparent: true, opacity: 0.9 }));
+comShadow.rotation.x = -Math.PI / 2;
+const comLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const comLine = new THREE.Line(comLineGeo, new THREE.LineBasicMaterial({ color: COL.gold, transparent: true, opacity: 0.6 }));
+const supRing = [0, 1].map(() => { const r = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.085, 32), new THREE.MeshBasicMaterial({ color: COL.teal, transparent: true, opacity: 0.55, side: THREE.DoubleSide })); r.rotation.x = -Math.PI / 2; return r; });
+scene.add(comDot, comShadow, comLine, ...supRing);
+function comMark(g) {
+  const c = COM.c; comDot.position.copy(c); comShadow.position.set(c.x, 0.006, c.z);
+  const a = comLineGeo.attributes.position; a.setXYZ(0, c.x, c.y, c.z); a.setXYZ(1, c.x, 0.006, c.z); a.needsUpdate = true;
+  comShadow.material.color.setHex(COM.ok ? COL.teal : COL.coral);
+  supRing.forEach((r, i) => { r.visible = !!g[i]; if (g[i]) r.position.set(g[i].x, 0.005, g[i].z); r.material.color.setHex(COM.ok ? COL.teal : COL.coral); });
+}
+// head with drawn face
+const headGroup = new THREE.Group(); scene.add(headGroup);
+const headRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.016, 12, 48), new THREE.MeshBasicMaterial({ color: COL.coral }));
+const headFill = new THREE.Mesh(new THREE.SphereGeometry(0.118, 28, 20), new THREE.MeshBasicMaterial({ color: 0x2a1418 }));
+const headGlow = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 16), glowMat(COL.coral, 0.12));
+const faceCanvas = document.createElement("canvas"); faceCanvas.width = faceCanvas.height = 256;
+const faceTex = new THREE.CanvasTexture(faceCanvas);
+const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: faceTex, transparent: true }));
+facePlane.position.z = 0.121; headGroup.add(headFill, headRing, headGlow, facePlane);
+function drawFace(ex) {
+  const g = faceCanvas.getContext("2d"); g.clearRect(0, 0, 256, 256); g.lineCap = "round";
+  const W = "rgba(255,255,255,.95)", C = "#ee7a6e"; g.strokeStyle = W; g.fillStyle = W; g.lineWidth = 10;
+  const eyes = [[92, 110], [164, 110]];
+  eyes.forEach(([x, y], i) => {
+    g.beginPath();
+    if (ex === "love") { g.fillStyle = C; heart(g, x, y, 20); g.fillStyle = W; }
+    else if (ex === "dreamy" || (ex === "smug" && i === 1)) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+    else if (ex === "laugh") { g.moveTo(x - 16, y + 6); g.lineTo(x, y - 10); g.lineTo(x + 16, y + 6); g.stroke(); }
+    else { g.arc(x, y, ex === "ooh" ? 15 : 12, 0, Math.PI * 2); g.fill(); }
+  });
+  g.lineWidth = 8;
+  eyes.forEach(([x, y], i) => { const lift = (ex === "smug" && i === 1) ? -14 : ex === "ooh" ? -10 : 0; const tl = ex === "focus" ? (i ? 8 : -8) : 0;
+    g.beginPath(); g.moveTo(x - 18, y - 40 + lift - tl); g.lineTo(x + 18, y - 40 + lift + tl); g.stroke(); });
+  g.lineWidth = 10; g.beginPath();
+  if (ex === "laugh") { g.moveTo(90, 150); g.arc(128, 150, 38, Math.PI, 0, true); g.closePath(); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
+  else if (ex === "ooh") { g.arc(128, 172, 18, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
+  else if (ex === "smug") { g.moveTo(96, 168); g.bezierCurveTo(124, 178, 146, 172, 164, 148); g.stroke(); }
+  else if (ex === "focus") { g.moveTo(100, 160); g.lineTo(156, 160); g.stroke(); g.fillStyle = C; g.beginPath(); g.arc(140, 168, 12, 0, Math.PI); g.fill(); }
+  else { g.arc(128, 136, 38, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); }
+  g.fillStyle = "rgba(238,122,110,.55)"; [[62, 150], [194, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill(); });
+  faceTex.needsUpdate = true;
+}
+function heart(g, x, y, s) { g.beginPath(); g.moveTo(x, y + s * 0.9); g.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.6, y - s * 1.1, x, y - s * 0.35);
+  g.bezierCurveTo(x + s * 0.6, y - s * 1.1, x + s * 1.4, y - s * 0.1, x, y + s * 0.9); g.fill(); }
+drawFace("smile");
+
+// FK skeleton (invisible joints)
+const J = n => { const o = new THREE.Object3D(); o.name = n; return o; };
+const root = J("root"); scene.add(root);
+const hipL = J(), hipR = J(); hipL.position.set(-0.13, 0, 0); hipR.position.set(0.13, 0, 0); root.add(hipL, hipR);
+const sp1 = J(), sp2 = J(), sp3 = J(), chest = J(); root.add(sp1); sp1.add(sp2); sp2.position.y = 0.17; sp2.add(sp3); sp3.position.y = 0.17; sp3.add(chest); chest.position.y = 0.16;
+// neck: three small joints so nods, tilts and slides bend it in a smooth curve
+const neckBase = J(); chest.add(neckBase); neckBase.position.y = 0.10;
+const nk2 = J(); neckBase.add(nk2); nk2.position.y = 0.045;
+const neckTop = J(); nk2.add(neckTop); neckTop.position.y = 0.045;
+const headC = J(); neckTop.add(headC); headC.position.y = 0.13;
+const NECK_REACH = 0.09;
+// one simple arc: a bend direction (any mix of forward/back and left/right) and an amount, split evenly over the joints
+const _ax = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
+function arcStep(fwdDeg, sideDeg, n, out) {
+  const a = Math.hypot(fwdDeg, sideDeg) * D2R;
+  if (a < 1e-6) return out.identity();
+  _ax.set(fwdDeg, 0, sideDeg).normalize(); return out.setFromAxisAngle(_ax, a / n);
+}
+function makeArm(side) {
+  const sh = J(); chest.add(sh); const el = J(); sh.add(el); el.position.y = -0.27; const wr = J(); el.add(wr); wr.position.y = -0.25;
+  const hand = J(); wr.add(hand); hand.position.y = -0.09; return { sh, el, wr, hand, side };
+}
+const armL = makeArm(1), armR = makeArm(-1);
+const W3 = o => o.getWorldPosition(new THREE.Vector3());
+
+// Sparky faces the audience, so his own left is the viewer's right: mirror every sideways control
+const SIDEWAYS = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx", "fLx", "fRx"];
+function poseCore(p0, bounce, ox, oz) {
+  const p = { ...p0 }; SIDEWAYS.forEach(k => p[k] = -(p0[k] || 0));
+  root.position.set(p.hx + ox, 0.98 - p.hy - bounce, p.hz + oz);
+  hipL.position.x = p.hw; hipR.position.x = -p.hw;
+  root.rotation.set(0, p.hyaw * D2R, p.hroll * D2R, "YXZ");
+  // spine: a single arc from hips to shoulders; it starts upright even when the hips tilt, so there is no S or kink
+  arcStep(p.sl, p.sb, 3, _qa);
+  sp1.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -p.hroll * D2R).multiply(_qa);
+  sp2.quaternion.copy(_qa); sp3.quaternion.copy(_qa);
+  chest.rotation.set(0, (p.syaw - p.hyaw * 0.5) * D2R, p.sroll * D2R, "YXZ");
+  armL.sh.position.set(armL.side * 0.21, 0.1 + p.shL, 0); armR.sh.position.set(armR.side * 0.21, 0.1 + p.shR, 0);
+  // head slide / peck: bend the neck base one way and the top back the other, so the head stays level
+  const as = v => Math.asin(Math.max(-0.95, Math.min(0.95, (v || 0) / NECK_REACH)));
+  // neck: nod and tilt are one small arc over the three neck joints; slide/peck add an S so the head stays level
+  const nx = as(p.nkx), nz = as(p.nkz);
+  arcStep(p.hnd, -p.htl, 3, _qa);
+  const slide = (x, z) => new THREE.Quaternion().setFromEuler(new THREE.Euler(z, 0, -x));
+  neckBase.quaternion.copy(_qa).multiply(slide(nx, nz));
+  nk2.quaternion.copy(_qa);
+  neckTop.quaternion.copy(_qa).multiply(slide(-nx, -nz)).multiply(_qb.setFromAxisAngle(UP, p.htn * D2R));
+  for (const [a, k] of [[armL, "L"], [armR, "R"]]) {
+    const s = a.side;
+    a.sh.rotation.set(-p["a" + k + "s"] * D2R, 0, s * p["a" + k + "r"] * D2R, "ZXY");
+    a.el.rotation.set(-p["a" + k + "f"] * D2R, 0, s * p["a" + k + "b"] * D2R, "XZY");
+    a.wr.rotation.set(0, 0, s * p["a" + k + "w"] * D2R);
+  }
+  root.updateMatrixWorld(true);
+  const pel = W3(root), hl = W3(hipL), hr = W3(hipR), c1 = W3(sp2), c2 = W3(sp3), ch = W3(chest), nb = W3(neckBase), n2 = W3(nk2), nk = W3(neckTop), hd = W3(headC);
+  setSeg(S.hips, hl, hr, 0.02); setSpine([pel, c1, c2, ch, nb, n2, nk]);
+  const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
+  setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setSeg(S.hdL, W3(armL.wr), W3(armL.hand), 0.022);
+  setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setSeg(S.hdR, W3(armR.wr), W3(armR.hand), 0.022);
+  headGroup.position.copy(hd); headC.getWorldQuaternion(headGroup.quaternion);
+  // legs: two-bone IK, knees bend toward the pelvis' facing
+  const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6);
+  // feet stand a little wider than the hips; "knee up" lifts the foot up and forward so the thigh comes level (passé)
+  const st = p.hw + 0.04;
+  const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45, p.fz * 0.5).addScaledVector(fwd, p.kL * 0.40);
+  const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45, -p.fz * 0.5).addScaledVector(fwd, p.kR * 0.40);
+  leg(hl, footL, fwd, S.thL, S.shinL, S.ftL);
+  leg(hr, footR, fwd, S.thR, S.shinR, S.ftR);
+  // eyes on hand: aim the face at the hand (turn + look up/down, measured from the chest), blended by the slider
+  const wl = p0.lookL || 0, wr = p0.lookR || 0;
+  if (!p0._aim && (wl > 0 || wr > 0)) {
+    const hand = W3(wr >= wl ? armR.hand : armL.hand), w = Math.max(wl, wr);
+    const d = hand.sub(W3(headC)).applyQuaternion(chest.getWorldQuaternion(new THREE.Quaternion()).invert());
+    const turn = Math.max(-75, Math.min(75, Math.atan2(d.x, d.z) / D2R));
+    const up = Math.max(-35, Math.min(50, Math.atan2(d.y, Math.hypot(d.x, d.z)) / D2R));
+    const lerp = (a, b) => a + (b - a) * w;
+    poseCore({ ...p0, _aim: 1, htn: lerp(p0.htn, -turn), hnd: lerp(p0.hnd, -up) }, bounce, ox, oz);
+  }
+}
+// ---------- center of gravity ----------
+// rough body-segment mass shares (adds to 1): trunk, head, arms, legs at their segment midpoints
+function centerOfMass() {
+  const m = (a, b) => a.clone().add(b).multiplyScalar(0.5), c = new THREE.Vector3(); let tot = 0;
+  const add = (v, w) => { c.addScaledVector(v, w); tot += w; };
+  const pel = W3(root), ch = W3(chest), hd = W3(headC);
+  add(m(pel, ch), 0.50); add(hd, 0.08);
+  for (const a of [armL, armR]) { const s = W3(a.sh), e = W3(a.el), w = W3(a.wr), h = W3(a.hand); add(m(s, e), 0.028); add(m(e, w), 0.016); add(m(w, h), 0.006); }
+  for (const k of ["L", "R"]) { const L = LEGS[k]; add(m(L.hip, L.knee), 0.10); add(m(L.knee, L.foot), 0.0465); add(m(L.foot, L.toe), 0.0145); }
+  return c.multiplyScalar(1 / tot);
+}
+function support() {           // where the weight can sit: one standing foot, or the line between two
+  const g = ["L", "R"].filter(k => LEGS[k].foot.y < 0.07).map(k => LEGS[k].foot.clone().lerp(LEGS[k].toe, 0.4).setY(0));
+  return g;
+}
+function nearestSupport(c, g) {
+  const q = c.clone().setY(0);
+  if (g.length === 1) return g[0];
+  const ab = g[1].clone().sub(g[0]), t = Math.max(0, Math.min(1, q.clone().sub(g[0]).dot(ab) / Math.max(1e-6, ab.lengthSq())));
+  return g[0].clone().addScaledVector(ab, t);
+}
+const COM = { c: new THREE.Vector3(), ok: true };
+function applyPose(p, bounce) {
+  let ox = 0, oz = 0;
+  poseCore(p, bounce, 0, 0);
+  if (p.bal > 0) {
+    let fx = 0, fz = 0;
+    for (let i = 0; i < 5; i++) {           // slide the hips until the center of gravity sits over the support
+      const c = centerOfMass(), g = support(); if (!g.length) break;
+      const s = nearestSupport(c, g); fx += s.x - c.x; fz += s.z - c.z;
+      fx = Math.max(-0.35, Math.min(0.35, fx)); fz = Math.max(-0.3, Math.min(0.3, fz));
+      poseCore(p, bounce, fx, fz);
+    }
+    ox = fx * p.bal; oz = fz * p.bal; if (p.bal < 1) poseCore(p, bounce, ox, oz);
+  }
+  COM.c.copy(centerOfMass()); const g = support();
+  COM.ok = g.length > 0 && nearestSupport(COM.c, g).distanceTo(COM.c.clone().setY(0)) < 0.06;
+  comMark(g);
+}
+const LEGS = {};
+function leg(h, f, fwd, sTh, sSh, sFt) {
+  const L = 0.47, v = new THREE.Vector3().subVectors(f, h); let d = Math.min(v.length(), 2 * L - 0.001);
+  v.setLength(d); const foot = h.clone().add(v);
+  const mid = h.clone().addScaledVector(v, 0.5); const ht = Math.sqrt(Math.max(0, L * L - (d / 2) ** 2));
+  const perp = fwd.clone().sub(v.clone().normalize().multiplyScalar(fwd.dot(v) / d)).normalize();
+  const knee = mid.addScaledVector(perp, ht);
+  const toe = foot.clone().add(fwd.clone().multiplyScalar(0.11));
+  setSeg(sTh, h, knee, 0.021); setSeg(sSh, knee, foot, 0.02); setSeg(sFt, foot, toe, 0.026);
+  LEGS[sTh === S.thL ? "L" : "R"] = { hip: h.clone(), knee: knee.clone(), foot: foot.clone(), toe };
+}
+
+// ---------- routine ----------
+const SLOT_N = 16; let slots = new Array(SLOT_N).fill(null); let sel = 0;
+const P_ = (o) => ({ ...DEF, face: "smile", ...o });
+const SAMPLE = [
+  [0, P_(PRESETS["Hip pop L"])], [2, P_(PRESETS["Hip pop R"])], [4, P_({ ...PRESETS["Hip pop L"], face: "laugh" })], [6, P_({ ...PRESETS["Hip pop R"], face: "laugh" })],
+  [8, P_(PRESETS["Body roll"])], [10, P_({ ...PRESETS["Body roll"], sl: -16, hz: 0.06, hnd: 8 })], [12, P_(PRESETS["Shimmy"])], [13, P_({ ...PRESETS["Shimmy"], syaw: -25, shL: 0, shR: 0.06 })],
+  [14, P_(PRESETS["Jazz hands"])], [15, P_(PRESETS["Heart"])] ];
+function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i] = p); }
+try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && saved.slots) { slots = saved.slots.map(s => s && { ...DEF, face: "smile", ...s }); document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
+function persist() { try { localStorage.setItem("sparky-routine", JSON.stringify({ bpm: bpm(), slots })); } catch (e) {} }
+const slotBox = document.getElementById("slots"); const slotEls = [];
+for (let i = 0; i < SLOT_N; i++) { const b = document.createElement("button"); b.className = "slot" + (i % 2 ? " and" : ""); b.textContent = i % 2 ? "&" : String(i / 2 + 1);
+  b.setAttribute("aria-label", i % 2 ? `and of ${Math.floor(i / 2) + 1}` : `count ${i / 2 + 1}`);
+  b.addEventListener("click", () => { stopPlay(); sel = i; if (slots[i]) { P = { ...slots[i] }; syncUI(); drawFace(P.face); } paintSlots(); });
+  slotBox.appendChild(b); slotEls.push(b); }
+function paintSlots(playIdx = -1) { slotEls.forEach((b, i) => { b.classList.toggle("filled", !!slots[i]); b.classList.toggle("sel", i === sel); b.classList.toggle("play", i === playIdx); }); }
+function setStatus(t) { document.getElementById("status").textContent = t; }
+document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}.`); });
+document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
+document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", hw: P.hw }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
+
+// ---------- playback ----------
+let playing = false, t0 = 0, metro = true, groove = true, actx = null, lastTick = -1;
+const bpm = () => Math.max(60, Math.min(180, parseFloat(document.getElementById("bpm").value) || 117));
+document.getElementById("bpm").addEventListener("change", persist);
+const playBtn = document.getElementById("play");
+playBtn.addEventListener("click", () => playing ? stopPlay() : startPlay());
+function startPlay() {
+  if (!slots.some(Boolean)) { setStatus("Save at least one pose first."); return; }
+  playing = true; t0 = performance.now(); lastTick = -1; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary");
+  if (metro) { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+}
+function stopPlay() { if (!playing) return; playing = false; playBtn.textContent = "▶ Play"; playBtn.classList.add("primary"); paintSlots(); }
+document.getElementById("metro").addEventListener("click", e => { metro = !metro; e.target.classList.toggle("on", metro); });
+document.getElementById("groove").addEventListener("click", e => { groove = !groove; e.target.classList.toggle("on", groove); });
+function tick(accent) { if (!actx) return; const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = accent ? 1500 : 1000;
+  g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(accent ? 0.25 : 0.12, actx.currentTime + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.06); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.07); }
+const ease = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
+function poseAt(pos) {               // pos in half-beats, wraps over the 16 slots
+  const keys = slots.map((s, i) => s ? i : -1).filter(i => i >= 0);
+  if (keys.length === 1) return { pose: slots[keys[0]], face: slots[keys[0]].face };
+  const p = pos % SLOT_N; let a = keys[keys.length - 1], b = keys[0];
+  for (let i = 0; i < keys.length; i++) { if (keys[i] <= p) a = keys[i]; }
+  const ai = keys.indexOf(a); b = keys[(ai + 1) % keys.length];
+  let span = (b - a + SLOT_N) % SLOT_N || SLOT_N, into = (p - a + SLOT_N) % SLOT_N;
+  const k = ease(Math.min(1, into / Math.min(span, 1.6)));   // snap into each pose, then hold
+  const A = slots[a], B = slots[b], out = {};
+  for (const key in DEF) out[key] = A[key] + (B[key] - A[key]) * k;
+  return { pose: out, face: k > 0.5 ? B.face : A.face };
+}
+let shownFace = "smile";
+function frame(now) {
+  let bounce = 0, p = P, beats = 0;
+  if (playing) {
+    beats = (now - t0) / 1000 * bpm() / 60; const pos = beats * 2;
+    const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); }
+    if (groove) bounce = 0.025 * (0.5 + 0.5 * Math.cos(4 * Math.PI * beats)) ** 2;
+    const ti = Math.floor(beats); if (ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
+    paintSlots(Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (Math.floor(beats) % 8) + 1 + ((pos % 2) >= 1 ? " &" : "");
+    rings.forEach((r, i) => { const ph = (beats - i * 0.33) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
+  } else {
+    if (P.face !== shownFace) { shownFace = P.face; drawFace(shownFace); }
+    rings.forEach(r => r.material.opacity = 0);
+    document.getElementById("countNow").textContent = sel % 2 ? (Math.floor(sel / 2) + 1) + " &" : String(sel / 2 + 1);
+  }
+  applyPose(p, bounce);
+  const tsec = now / 1000;
+  cubes.forEach(c => { c.rotation.x = tsec * c.userData.sp; c.rotation.y = tsec * c.userData.sp * 0.7; c.position.y = c.userData.y0 + 0.08 * Math.sin(tsec * c.userData.sp * 2 + c.userData.ph); });
+  placeCam(); renderer.render(scene, camera); requestAnimationFrame(frame);
+}
+
+// ---------- dance card in/out ----------
+function card() {
+  const counts = slots.map((s, i) => s && { count: i % 2 ? `${Math.floor(i / 2) + 1}&` : `${i / 2 + 1}`, ...Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) }).filter(Boolean);
+  return JSON.stringify({ rig: "sparky-dance-rig/1", bpm: bpm(), counts }, null, 1);
+}
+document.getElementById("copyCard").addEventListener("click", () => {
+  const txt = card(); const ta = document.getElementById("cardIn");
+  navigator.clipboard.writeText(txt).then(() => toast("Dance card copied. Paste it to Claude to animate it."))
+    .catch(() => { ta.value = txt; ta.select(); toast("Dance card is in the box below. Copy it from there."); });
+});
+document.getElementById("loadCard").addEventListener("click", () => {
+  try { const d = JSON.parse(document.getElementById("cardIn").value); const ns = new Array(SLOT_N).fill(null);
+    (d.counts || []).forEach(c => { const m = String(c.count).match(/^(\d+)(&?)$/); if (!m) return; const i = (parseInt(m[1]) - 1) * 2 + (m[2] ? 1 : 0); if (i >= 0 && i < SLOT_N) { const { count, ...rest } = c; ns[i] = { ...DEF, face: "smile", ...rest }; } });
+    slots = ns; unifyBody(); syncUI(); if (d.bpm) document.getElementById("bpm").value = d.bpm; persist(); paintSlots(); toast("Dance card loaded.");
+  } catch (e) { toast("That doesn't look like a dance card. Copy one from the rig and try again."); }
+});
+let toastT; function toast(m) { const el = document.getElementById("toast"); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
+
+// ---------- score views: Sutton stick staff, Eshkol-Wachman limb grid, BVH ----------
+function joints(p) {
+  applyPose(p, 0);
+  return { pel: W3(root), c1: W3(sp2), c2: W3(sp3), ch: W3(chest), nb: W3(neckBase), n2: W3(nk2), nk: W3(neckTop), hd: W3(headC),
+    shL: W3(armL.sh), elL: W3(armL.el), wrL: W3(armL.wr), haL: W3(armL.hand),
+    shR: W3(armR.sh), elR: W3(armR.el), wrR: W3(armR.wr), haR: W3(armR.hand),
+    hiL: LEGS.L.hip, knL: LEGS.L.knee, ftL: LEGS.L.foot, toL: LEGS.L.toe,
+    hiR: LEGS.R.hip, knR: LEGS.R.knee, ftR: LEGS.R.foot, toR: LEGS.R.toe };
+}
+let scoreCache = [];
+function rebuildScore() { scoreCache = slots.map(s => s ? { j: joints(s), face: s.face } : null); drawStaff(); drawGrid(); }
+const staff = document.getElementById("staff");
+function drawStaff(playIdx = -1) {
+  const r = staff.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  staff.width = r.width * dpr; staff.height = r.height * dpr; const g = staff.getContext("2d"); g.scale(dpr, dpr);
+  const w = r.width, h = r.height, colW = w / SLOT_N, base = h - 22, sc = (base - 14) / 2.05;
+  // the five Sutton lines: floor, knee, hip, shoulder, head
+  const lines = [[0.03, "feet"], [0.5, "knees"], [0.95, "hips"], [1.55, "shoulders"], [1.77, "head"]];
+  g.font = "10px " + getComputedStyle(document.body).fontFamily; g.textBaseline = "middle";
+  lines.forEach(([y, n]) => { g.strokeStyle = "#1d2a3d"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, base - y * sc); g.lineTo(w, base - y * sc); g.stroke(); });
+  for (let i = 0; i < SLOT_N; i++) {
+    const cx = colW * (i + 0.5);
+    if (i % 2 === 0) { g.strokeStyle = "#2a3a52"; g.beginPath(); g.moveTo(colW * i, 4); g.lineTo(colW * i, base + 4); g.stroke(); }
+    g.fillStyle = i === playIdx ? "#f0c060" : "#8796ab"; g.textAlign = "center"; g.fillText(i % 2 ? "&" : String(i / 2 + 1), cx, h - 9);
+    const c = scoreCache[i]; if (!c) continue;
+    const j = c.j, X = v => cx + v.x * sc * 0.9, Y = v => base - v.y * sc;
+    const path = (pts, col) => { g.strokeStyle = col; g.lineWidth = 2; g.lineCap = "round"; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))); g.stroke(); };
+    path([j.hiL, j.knL, j.ftL, j.toL], "#58b4e6"); path([j.hiR, j.knR, j.ftR, j.toR], "#58b4e6");
+    path([j.hiL, j.hiR], "#5fd3c4"); curve([j.pel, j.c1, j.c2, j.ch, j.nb, j.n2, j.nk], "#5fd3c4"); path([j.shL, j.ch, j.shR], "#5fd3c4");
+    path([j.shL, j.elL, j.wrL, j.haL], "#f0c060"); path([j.shR, j.elR, j.wrR, j.haR], "#f0c060");
+    function curve(pts, col) { g.strokeStyle = col; g.lineWidth = 2; g.lineCap = "round"; g.beginPath(); g.moveTo(X(pts[0]), Y(pts[0]));
+      for (let k = 1; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1]; g.quadraticCurveTo(X(a), Y(a), (X(a) + X(b)) / 2, (Y(a) + Y(b)) / 2); }
+      const L = pts[pts.length - 1]; g.lineTo(X(L), Y(L)); g.stroke(); }
+    g.strokeStyle = "#ee7a6e"; g.beginPath(); g.arc(X(j.hd), Y(j.hd), 0.12 * sc, 0, Math.PI * 2); g.stroke();
+    if (i === sel) { g.strokeStyle = "#f0c060"; g.strokeRect(colW * i + 1, 2, colW - 2, base + 2); }
+  }
+}
+// Eshkol-Wachman coordinates, scale 1 = 45 degrees: vertical 0 = straight down, 4 = straight up;
+// horizontal 0 = toward the audience, counted clockwise looking down from above.
+function ew(a, b) {
+  const d = new THREE.Vector3().subVectors(b, a).normalize();
+  const vDeg = Math.acos(Math.max(-1, Math.min(1, -d.y))) * 180 / Math.PI;
+  const v = Math.round(vDeg / 45);
+  let hDeg = (-Math.atan2(d.x, d.z) * 180 / Math.PI + 360) % 360;
+  const hh = (v === 0 || v === 4) ? 0 : Math.round(hDeg / 45) % 8;
+  return { v, h: hh, tip: `${Math.round(vDeg)}° up from down, ${Math.round(hDeg)}° clockwise from front` };
+}
+const LIMBS = [["Head", "nk", "hd"], ["Neck", "nb", "nk"], ["Trunk", "pel", "ch"], ["L upper arm", "shL", "elL"], ["L forearm", "elL", "wrL"],
+  ["R upper arm", "shR", "elR"], ["R forearm", "elR", "wrR"], ["L thigh", "hiL", "knL"], ["L shin", "knL", "ftL"], ["R thigh", "hiR", "knR"], ["R shin", "knR", "ftR"]];
+function drawGrid() {
+  const el = document.getElementById("grid");
+  let html = `<table><thead><tr><th scope="col">Limb</th>${Array.from({ length: SLOT_N }, (_, i) => `<th scope="col">${i % 2 ? "&" : i / 2 + 1}</th>`).join("")}</tr></thead><tbody>`;
+  LIMBS.forEach(([name, a, b]) => {
+    html += `<tr><th scope="row">${name}</th>`;
+    let prev = null;
+    for (let i = 0; i < SLOT_N; i++) {
+      const c = scoreCache[i];
+      if (!c) { html += `<td class="hold">${prev ? "·" : ""}</td>`; continue; }
+      const e = ew(c.j[a], c.j[b]); const same = prev && prev.v === e.v && prev.h === e.h; prev = e;
+      html += `<td title="${e.tip}" class="${same ? "same" : ""}"><span class="ewv">${e.v}</span><span class="ewh">${e.h}</span></td>`;
+    }
+    html += "</tr>";
+  });
+  html += `<tr><th scope="row">Face</th>${scoreCache.map(c => `<td class="face">${c ? c.face : ""}</td>`).join("")}</tr></tbody></table>`;
+  el.innerHTML = html;
+}
+document.querySelectorAll("[data-score]").forEach(b => b.addEventListener("click", () => {
+  const v = b.dataset.score; document.querySelectorAll("[data-score]").forEach(x => x.classList.toggle("on", x === b));
+  staff.hidden = v !== "staff"; document.getElementById("grid").hidden = v !== "grid"; if (v === "staff") drawStaff();
+}));
+new ResizeObserver(() => drawStaff()).observe(staff);
+
+// BVH: skeleton hierarchy + one row of channel values per frame (centimetres, ZXY degrees)
+function bvh() {
+  const fps = 30, beats = SLOT_N / 2, frames = Math.round(beats * 60 / bpm() * fps);
+  const off = (o) => `${(o.x * 100).toFixed(2)} ${(o.y * 100).toFixed(2)} ${(o.z * 100).toFixed(2)}`;
+  const R3 = "CHANNELS 3 Zrotation Xrotation Yrotation";
+  const chain = (ind, name, o, body) => `${ind}JOINT ${name}\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}\t${R3}\n${body}${ind}}\n`;
+  const end = (ind, o) => `${ind}End Site\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}}\n`;
+  const armTxt = (s, side) => chain("\t\t\t\t\t", side + "Shoulder", off(new THREE.Vector3(s * 0.21, 0.1, 0)),
+    chain("\t\t\t\t\t\t", side + "Elbow", "0.00 -27.00 0.00", chain("\t\t\t\t\t\t\t", side + "Wrist", "0.00 -25.00 0.00", end("\t\t\t\t\t\t\t\t", "0.00 -9.00 0.00"))));
+  const hw0 = (slots.find(Boolean) || DEF).hw || 0.13;
+  const legTxt = (s, side) => chain("\t", side + "Hip", off(new THREE.Vector3(s * hw0, 0, 0)),
+    chain("\t\t", side + "Knee", "0.00 -47.00 0.00", chain("\t\t\t", side + "Ankle", "0.00 -47.00 0.00", end("\t\t\t\t", "0.00 0.00 11.00"))));
+  let txt = "HIERARCHY\nROOT Hips\n{\n\tOFFSET 0.00 0.00 0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n" +
+    chain("\t", "Spine", "0.00 0.00 0.00", chain("\t\t", "Spine1", "0.00 17.00 0.00", chain("\t\t\t", "Spine2", "0.00 17.00 0.00",
+      chain("\t\t\t\t", "Chest", "0.00 16.00 0.00", chain("\t\t\t\t\t", "Neck", "0.00 10.00 0.00", chain("\t\t\t\t\t\t", "Neck1", "0.00 4.50 0.00", chain("\t\t\t\t\t\t\t", "Neck2", "0.00 4.50 0.00",
+        chain("\t\t\t\t\t\t\t\t", "Head", "0.00 13.00 0.00", end("\t\t\t\t\t\t\t\t\t", "0.00 12.00 0.00"))))) +
+      armTxt(1, "Left") + armTxt(-1, "Right"))))) + legTxt(1, "Left") + legTxt(-1, "Right") + "}\n";
+  txt += `MOTION\nFrames: ${frames}\nFrame Time: ${(1 / fps).toFixed(6)}\n`;
+  const eul = new THREE.Euler(), q = new THREE.Quaternion(), qa = new THREE.Quaternion(), DOWN = new THREE.Vector3(0, -1, 0);
+  const rot = (quat) => { eul.setFromQuaternion(quat, "ZXY"); return [eul.z, eul.x, eul.y].map(r => (r * 180 / Math.PI).toFixed(3)).join(" "); };
+  const legRot = (L) => {
+    const rootQ = root.getWorldQuaternion(new THREE.Quaternion());
+    const thigh = new THREE.Vector3().subVectors(L.knee, L.hip).normalize().applyQuaternion(rootQ.clone().invert());
+    const qh = new THREE.Quaternion().setFromUnitVectors(DOWN, thigh);
+    const wq = rootQ.clone().multiply(qh);
+    const shin = new THREE.Vector3().subVectors(L.foot, L.knee).normalize().applyQuaternion(wq.clone().invert());
+    const qk = new THREE.Quaternion().setFromUnitVectors(DOWN, shin);
+    const wq2 = wq.clone().multiply(qk);
+    const toe = new THREE.Vector3().subVectors(L.toe, L.foot).normalize().applyQuaternion(wq2.clone().invert());
+    const qa_ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), toe);
+    return [rot(qh), rot(qk), rot(qa_)];
+  };
+  const ident = new THREE.Quaternion();
+  for (let f = 0; f < frames; f++) {
+    const b = f / fps * bpm() / 60, r = poseAt(b * 2);
+    applyPose(r.pose, groove ? 0.025 * (0.5 + 0.5 * Math.cos(4 * Math.PI * b)) ** 2 : 0);
+    const row = [off(root.position), rot(root.quaternion), rot(sp1.quaternion), rot(sp2.quaternion), rot(sp3.quaternion), rot(chest.quaternion), rot(neckBase.quaternion), rot(nk2.quaternion), rot(neckTop.quaternion), rot(ident)];
+    for (const a of [armL, armR]) row.push(rot(a.sh.quaternion), rot(a.el.quaternion), rot(a.wr.quaternion));
+    row.push(...legRot(LEGS.L), ...legRot(LEGS.R));
+    txt += row.join(" ") + "\n";
+  }
+  return txt;
+}
+document.getElementById("copyBvh").addEventListener("click", () => {
+  const txt = bvh(); const ta = document.getElementById("cardIn");
+  navigator.clipboard.writeText(txt).then(() => toast("BVH copied. Paste it into a .bvh file, or send it to Claude."))
+    .catch(() => { ta.value = txt; ta.select(); toast("BVH is in the box on the right. Copy it from there."); });
+});
+
+const _paint = paintSlots;
+paintSlots = function (playIdx = -1) { _paint(playIdx); if (!staff.hidden) drawStaff(playIdx); };
+const _persist = persist;
+persist = function () { _persist(); rebuildScore(); };
+
+unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationFrame(frame);
+})();
+</script>
+
+<script>
+// offline support: register the service worker (works on https, e.g. GitHub Pages, and on localhost)
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+</script>
+</body>
+</html>
