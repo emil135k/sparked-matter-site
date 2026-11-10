@@ -1,4 +1,4 @@
-# Sparky Dance Rig (installable web app)
+# Sparky's Dance Studio (installable web app)
 
 Static files only: no build step, no server code. Works offline after the first visit.
 
