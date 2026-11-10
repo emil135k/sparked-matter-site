@@ -42,6 +42,17 @@ h1 { font-family: var(--display); font-weight: 600; font-size: 28px; margin: 0; 
 #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 .views { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
 .hint { position: absolute; bottom: 10px; left: 12px; color: var(--muted); font-size: 12px; }
+.coach { position: absolute; top: 50px; left: 14px; text-align: left; pointer-events: none; display: none; }
+.coach.on { display: block; }
+.cbig { font-family: Fredoka, var(--mono); font-weight: 700; font-size: clamp(44px, 9vw, 88px); line-height: 1; color: var(--gold); text-shadow: 0 0 18px rgba(246,197,96,.35); }
+.cbig.even { color: var(--coral); text-shadow: 0 0 18px rgba(238,122,110,.35); }
+.cbig.sub { color: var(--teal); font-size: clamp(30px, 6vw, 58px); text-shadow: 0 0 14px rgba(95,211,196,.3); }
+.cbig.pre { color: var(--muted); }
+.cstrip { display: inline-flex; gap: 6px; margin-top: 8px; font-family: var(--mono); font-size: 15px; }
+.cstrip span { padding: 3px 9px; border-radius: 8px; background: rgba(22,34,58,.75); color: var(--muted); }
+.cstrip span.lit { background: var(--gold); color: #111; }
+.cstrip span.sub.lit { background: var(--teal); }
+.trow select { background: var(--panel, #0f1828); color: inherit; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px; font: inherit; }
 .countnow { position: absolute; top: 10px; right: 12px; font-family: var(--mono); font-size: 22px; color: var(--gold); }
 button, select, input[type=number] { font-family: var(--body); font-size: 13px; color: var(--ink); background: #132033;
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
@@ -111,6 +122,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button data-view="front">Front</button><button data-view="three">¾</button><button data-view="side">Side</button>
       </div>
       <div class="countnow" id="countNow">1</div>
+      <div class="coach" id="coach"><div class="cbig" id="cbig">1</div><div class="cstrip" id="cstrip"></div></div>
       <div class="hint">Drag to spin · pinch or scroll to zoom · two fingers (or shift-drag) to pan up/down · gold dot = center of gravity (floor dot turns coral when he'd tip over)</div>
     </div>
 
@@ -120,6 +132,19 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="metro" class="on">Click track</button>
         <button id="groove" class="on">Auto bounce</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" style="width:72px">
+      </div>
+      <div class="trow">
+        <span class="small">Learn to count:</span>
+        <button id="beatBtn">Hip-hop beat</button>
+        <select id="countLvl" aria-label="Counting level">
+          <option value="0">Off</option>
+          <option value="1">1 2 3 4</option>
+          <option value="2">1 & 2 &</option>
+          <option value="3">1 & a 2 & a</option>
+          <option value="4">1 e & a</option>
+        </select>
+        <button id="countIn" class="on">5-6-7-8 count-in</button>
+        <button id="bpm92">92 BPM (Mihran's tempo)</button>
         <span class="small" id="status">Sample routine loaded: 8 counts.</span>
       </div>
       <div class="slots" id="slots"></div>
@@ -575,10 +600,64 @@ const bpm = () => Math.max(60, Math.min(180, parseFloat(document.getElementById(
 document.getElementById("bpm").addEventListener("change", persist);
 const playBtn = document.getElementById("play");
 playBtn.addEventListener("click", () => playing ? stopPlay() : startPlay());
+// ---------- learn to count: beat, levels, count-in ----------
+let beatOn = false, countIn = true, lvl = 0, aStart = 0, nextStep = 0, noiseBuf = null;
+// each level lists where the spoken parts of a beat fall (fraction of the beat) and what they're called
+const LEVELS = [[], [[0, ""]], [[0, ""], [0.5, "&"]], [[0, ""], [0.5, "&"], [0.75, "a"]], [[0, ""], [0.25, "e"], [0.5, "&"], [0.75, "a"]]];
+const coachEl = document.getElementById("coach"), cbig = document.getElementById("cbig"), cstrip = document.getElementById("cstrip");
+function audio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} return actx; }
+function buildStrip(n) {
+  const parts = LEVELS[lvl] || []; cstrip.innerHTML = "";
+  parts.forEach(([f, lab]) => { const sp = document.createElement("span"); sp.textContent = f ? lab : n; sp.dataset.f = f; if (f) sp.className = "sub"; cstrip.appendChild(sp); });
+}
+function setLevel(v) { lvl = v; coachEl.classList.toggle("on", lvl > 0); buildStrip(1); }
+document.getElementById("countLvl").addEventListener("change", e => setLevel(+e.target.value));
+document.getElementById("beatBtn").addEventListener("click", e => { beatOn = !beatOn; e.target.classList.toggle("on", beatOn); if (beatOn && !lvl) { document.getElementById("countLvl").value = "2"; setLevel(2); } });
+document.getElementById("countIn").addEventListener("click", e => { countIn = !countIn; e.target.classList.toggle("on", countIn); });
+document.getElementById("bpm92").addEventListener("click", () => { document.getElementById("bpm").value = 92; persist(); });
+// drum voices (synthesized here, an original pattern)
+function nb() { if (noiseBuf) return noiseBuf; const n = actx.sampleRate; noiseBuf = actx.createBuffer(1, n, n); const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return noiseBuf; }
+function env(g, t, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
+function kick(t) { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12); env(g, t, 0.9, 0.35); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.4); }
+function noise(t, type, freq, peak, dec) { const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); s.buffer = nb(); f.type = type; f.frequency.value = freq; env(g, t, peak, dec); s.connect(f).connect(g).connect(actx.destination); s.start(t); s.stop(t + dec + 0.05); }
+function snare(t) { noise(t, "highpass", 1200, 0.5, 0.2); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 190; env(g, t, 0.25, 0.1); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.12); [0, 0.01, 0.02].forEach(d => noise(t + d, "bandpass", 1500, 0.25, 0.08)); }
+function hat(t, open, peak) { noise(t, "highpass", 7000, peak, open ? 0.22 : 0.045); }
+function crash(t) { noise(t, "highpass", 4500, 0.28, 1.4); }
+function blip(t, hi) { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = hi ? 1500 : 950; env(g, t, hi ? 0.22 : 0.1, 0.05); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.07); }
+// one step = a sixteenth note; 32 steps = one eight-count (two bars of 4/4)
+function playStep(step, t) {
+  const inBeat = step % 4, beat = Math.floor(step / 4), cnt = ((beat % 8) + 8) % 8 + 1;
+  if (step < 0) { if (inBeat === 0) blip(t, true); return; }                       // count-in: just "5, 6, 7, 8"
+  if (beatOn) {
+    const s16 = step % 16;                                                         // boom-bap bar
+    if (s16 === 0 || s16 === 7 || s16 === 10) kick(t);
+    if (s16 === 4 || s16 === 12) snare(t);                                         // snare on 2, 4, 6, 8
+    if (step % 2 === 0) hat(t, s16 === 14, s16 % 4 === 0 ? 0.16 : 0.1); else if (lvl >= 3) hat(t, false, 0.05);
+    if (step % 64 === 0) crash(t);                                                 // crash on the 1, every two eight-counts
+  }
+  if (metro) { const parts = LEVELS[lvl] || [[0, ""]]; if (parts.some(([f]) => Math.abs(f * 4 - inBeat) < 0.01)) blip(t, inBeat === 0); }
+}
+function schedule() {                                                               // keep ~0.12 s of steps queued on the audio clock
+  if (!actx) return; const sp = 60 / bpm() / 4;
+  while (aStart + nextStep * sp < actx.currentTime + 0.12) { playStep(nextStep, aStart + nextStep * sp); nextStep++; }
+}
+function nowBeats(now) { return actx ? (actx.currentTime - aStart) * bpm() / 60 : (now - t0) / 1000 * bpm() / 60; }
+function showCoach(beats) {
+  if (!lvl) return;
+  const b = Math.floor(beats), f = beats - b, n = ((b % 8) + 8) % 8 + 1, parts = LEVELS[lvl];
+  let cur = parts[0]; parts.forEach(x => { if (f >= x[0] - 0.02) cur = x; });
+  if (cstrip.firstChild && cstrip.firstChild.textContent != n) buildStrip(n);
+  const pre = beats < 0; cbig.textContent = cur[0] && !pre ? cur[1] : n;
+  cbig.className = "cbig" + (pre ? " pre" : cur[0] ? " sub" : n % 2 ? "" : " even");
+  [...cstrip.children].forEach(sp => sp.classList.toggle("lit", !pre && +sp.dataset.f === cur[0]));
+}
 function startPlay() {
-  if (!slots.some(Boolean)) { setStatus("Save at least one pose first."); return; }
-  playing = true; t0 = performance.now(); lastTick = -1; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary");
-  if (metro) { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+  if (!slots.some(Boolean) && !lvl && !beatOn) { setStatus("Save at least one pose first."); return; }
+  playing = true; lastTick = -1; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary");
+  const lead = countIn && (beatOn || lvl) ? 4 : 0;                                  // count-in starts on 5 so the 1 lands after "8"
+  t0 = performance.now() + lead * 60000 / bpm();
+  if (metro || beatOn || lvl) { audio(); if (actx) { aStart = actx.currentTime + 0.08 + lead * 60 / bpm(); nextStep = -lead * 4; } }
+  else actx = actx;
 }
 function stopPlay() { if (!playing) return; playing = false; playBtn.textContent = "▶ Play"; playBtn.classList.add("primary"); paintSlots(); }
 document.getElementById("metro").addEventListener("click", e => { metro = !metro; e.target.classList.toggle("on", metro); });
@@ -603,12 +682,16 @@ let shownFace = "smile";
 function frame(now) {
   let bounce = 0, p = P, beats = 0;
   if (playing) {
-    beats = (now - t0) / 1000 * bpm() / 60; const pos = beats * 2;
-    const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); }
-    if (groove) bounce = 0.025 * (0.5 + 0.5 * Math.cos(4 * Math.PI * beats)) ** 2;
-    const ti = Math.floor(beats); if (ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
-    paintSlots(Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (Math.floor(beats) % 8) + 1 + ((pos % 2) >= 1 ? " &" : "");
-    rings.forEach((r, i) => { const ph = (beats - i * 0.33) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
+    const useAudio = actx && (metro || beatOn || lvl); if (useAudio) schedule();
+    beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; const pos = Math.max(0, beats) * 2;
+    if (slots.some(Boolean)) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
+    // bounce follows the counting level: once a beat for "1 2 3 4", on every half beat otherwise
+    const bf = lvl === 1 ? 2 : 4;
+    if (groove && beats >= 0) bounce = 0.025 * (0.5 + 0.5 * Math.cos(bf * Math.PI * beats)) ** 2;
+    const ti = Math.floor(beats); if (!useAudio && ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
+    paintSlots(beats < 0 ? -1 : Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && (pos % 2) >= 1 ? " &" : "");
+    showCoach(beats);
+    rings.forEach((r, i) => { const ph = (((beats - i * 0.33) % 1) + 1) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
   } else {
     if (P.face !== shownFace) { shownFace = P.face; drawFace(shownFace); }
     rings.forEach(r => r.material.opacity = 0);
