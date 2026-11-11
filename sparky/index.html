@@ -63,6 +63,8 @@ button.primary { background: var(--teal); color: #04201c; border-color: var(--te
 button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); }
 .timeline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; }
 .trow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stage.key .hint, .stage.key .coach, .stage.key .countnow, .stage.key .views { display: none; }
+.stage.key { border-color: transparent; border-radius: 0; }
 .syncrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--gold); border-radius: 12px; }
 .syncrow label { font-weight: 700; color: var(--gold); }
 .syncrow input[type=range] { flex: 1 1 220px; min-width: 160px; height: 32px; accent-color: var(--gold); }
@@ -142,6 +144,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button class="primary" id="play">▶ Play</button>
         <button id="metro" class="on">Click track</button>
         <button id="groove" class="on">Auto bounce</button>
+        <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" step="0.01" style="width:80px">
       </div>
       <div class="trow">
@@ -198,7 +201,12 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <select id="face" style="grid-column: span 2">
           <option value="smile">😊 Smile</option><option value="dreamy">😌 Eyes closed</option><option value="smug">😏 Smug wink</option>
           <option value="laugh">😆 Laugh</option><option value="ooh">😮 Ooh</option><option value="focus">😛 Focused</option><option value="love">😍 Heart eyes</option>
+          <option value="wow">😲 Wow</option><option value="wink">😉 Wink</option><option value="cool">😎 Cool</option><option value="dizzy">😵 Mind blown</option>
         </select></div>
+      <div class="ctl"><label for="handL">Left hand</label>
+        <select id="handL" style="grid-column: span 2"><option value="">Use the Hand slider</option><option value="thumb">👍 Thumbs up</option><option value="point">👉 Point</option><option value="peace">✌️ Peace</option><option value="rock">🤘 Rock on</option></select></div>
+      <div class="ctl"><label for="handR">Right hand</label>
+        <select id="handR" style="grid-column: span 2"><option value="">Use the Hand slider</option><option value="thumb">👍 Thumbs up</option><option value="point">👉 Point</option><option value="peace">✌️ Peace</option><option value="rock">🤘 Rock on</option></select></div>
       <div class="presets" id="presets"></div>
       <div class="mixrow"><button id="mixBtn" class="on" aria-pressed="true">Mix moves</button>
         <span>On: each quick pose only changes the parts it uses, so you can stack them (legs first, then arms). Neutral starts over.</span></div>
@@ -257,7 +265,9 @@ GROUPS.forEach(g => {
 });
 const DIST = new Set(["gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
-function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; }
+function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
+const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
+for (const k of ["L", "R"]) handSel[k].addEventListener("change", () => { P["hand" + k] = handSel[k].value; liveSave(); });
 const faceSel = document.getElementById("face");
 faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.face); liveSave(); });
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
@@ -274,7 +284,7 @@ function liveSave() {
 }
 
 // mirror a pose left <-> right: swap the L/R controls and flip the sideways ones
-const SWAP = [["aLr", "aRr"], ["aLs", "aRs"], ["aLb", "aRb"], ["aLf", "aRf"], ["aLw", "aRw"], ["gL", "gR"], ["aLt", "aRt"], ["shL", "shR"], ["fLy", "fRy"], ["kL", "kR"], ["lookL", "lookR"]];
+const SWAP = [["aLr", "aRr"], ["aLs", "aRs"], ["aLb", "aRb"], ["aLf", "aRf"], ["aLw", "aRw"], ["gL", "gR"], ["aLt", "aRt"], ["handL", "handR"], ["shL", "shR"], ["fLy", "fRy"], ["kL", "kR"], ["lookL", "lookR"]];
 const FLIP = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx"];
 function mirror(o) {
   const m = { ...o };
@@ -296,6 +306,14 @@ const PRESETS = {
   "Jazz hands": { aLr: 80, aRr: 80, aLb: 95, aRb: 95, aLw: 20, aRw: 20, gL: 1, gR: 1, aLt: 90, aRt: 90, face: "ooh" },
   "Disco point R": DISCO_R,
   "Disco point L": mirror(DISCO_R),
+  "Thumbs up R": { aRr: 40, aRs: 0, aRb: 90, aRf: 60, aRt: 0, handR: "thumb", face: "wink" },
+  "Thumbs up L": { aLr: 40, aLs: 0, aLb: 90, aLf: 60, aLt: 0, handL: "thumb", face: "wink" },
+  "Two thumbs up": { aRr: 40, aRs: 0, aRb: 90, aRf: 60, aRt: 0, handR: "thumb", aLr: 40, aLs: 0, aLb: 90, aLf: 60, aLt: 0, handL: "thumb", face: "laugh" },
+  "Rock on": { aLr: 150, aRr: 150, aLb: 25, aRb: 25, aLt: 90, aRt: 90, handL: "rock", handR: "rock", sl: -8, face: "laugh" },
+  "Mind blown": { aLr: 140, aRr: 140, aLb: 125, aRb: 125, aLw: 30, aRw: 30, aLt: 90, aRt: 90, gL: 1, gR: 1, handL: "", handR: "", sl: -12, hnd: -8, face: "dizzy" },
+  "Watching": { sl: 12, hnd: 4, htl: 8, aLr: 22, aRr: 22, aLb: 35, aRb: 35, handL: "", handR: "", face: "ooh" },
+  "Look at that R": { aRr: 92, aRb: 4, handR: "point", lookR: 0.45, sb: -5, face: "wow" },
+  "Look at that L": { aLr: 92, aLb: 4, handL: "point", lookL: 0.45, sb: 5, face: "wow" },
   "Heart": { aLr: 150, aRr: 150, aLb: 120, aRb: 120, aLw: 40, aRw: 40, face: "love" },
   "Neck slide L": { nkx: -0.06, aLr: 90, aRr: 90, aLb: 90, aRb: 90, aLw: 30, aRw: 30, face: "smug" },
   "Neck slide R": { nkx: 0.06, aLr: 90, aRr: 90, aLb: 90, aRb: 90, aLw: 30, aRw: 30, face: "smug" },
@@ -381,12 +399,12 @@ const CYL = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true);
 const SPH = new THREE.SphereGeometry(1, 20, 14);
 function glowMat(c, o) { return new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }); }
 const COL = { teal: 0x5fd3c4, gold: 0xf0c060, sky: 0x58b4e6, coral: 0xee7a6e };
-const segs = [];
+const segs = [], GLOWS = [];
 function makeSeg(color) {
   const core = new THREE.Mesh(CYL, new THREE.MeshBasicMaterial({ color }));
   const glow = new THREE.Mesh(CYL, glowMat(color, 0.18));
   const capA = new THREE.Mesh(SPH, new THREE.MeshBasicMaterial({ color }));
-  scene.add(core, glow, capA); return { core, glow, capA };
+  scene.add(core, glow, capA); GLOWS.push(glow); return { core, glow, capA };
 }
 const UP = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3();
 function setSeg(s, a, b, r) {
@@ -428,8 +446,19 @@ function comMark(g) {
   const c = COM.c; comDot.position.copy(c); comShadow.position.set(c.x, 0.006, c.z);
   const a = comLineGeo.attributes.position; a.setXYZ(0, c.x, c.y, c.z); a.setXYZ(1, c.x, 0.006, c.z); a.needsUpdate = true;
   comShadow.material.color.setHex(COM.ok ? COL.teal : COL.coral);
-  supRing.forEach((r, i) => { r.visible = !!g[i]; if (g[i]) r.position.set(g[i].x, 0.005, g[i].z); r.material.color.setHex(COM.ok ? COL.teal : COL.coral); });
+  supRing.forEach((r, i) => { r.visible = !!g[i] && !keyMode; if (g[i]) r.position.set(g[i].x, 0.005, g[i].z); r.material.color.setHex(COM.ok ? COL.teal : COL.coral); });
 }
+// video background: a flat color a video editor can key out. Glows and stage dressing are hidden so the edge stays clean.
+let keyMode = 0; const KEYS = [null, 0x00ff00, 0xff00ff], KEY_NAMES = ["off", "green", "magenta"];
+function applyKey() {
+  scene.background = keyMode ? new THREE.Color(KEYS[keyMode]) : null;
+  const show = !keyMode;
+  [floor, grid, ...rings, ...cubes, comDot, comShadow, comLine, spineGlow, headGlow, handL.glow, handR.glow, ...GLOWS].forEach(o => { if (o) o.visible = show; });
+  canvas.parentElement.classList.toggle("key", !!keyMode);
+  const b = document.getElementById("keyBtn"); b.textContent = "Video background: " + KEY_NAMES[keyMode]; b.classList.toggle("on", !!keyMode);
+  if (keyMode) setStatus(keyMode === 1 ? "Green background on. Sparky's teal is close to green, so magenta usually keys cleaner: tap again." : "Magenta background on. Screen-record, then remove the magenta in your video editor (chroma key).");
+}
+document.getElementById("keyBtn").addEventListener("click", () => { keyMode = (keyMode + 1) % 3; applyKey(); });
 // head with drawn face
 const headGroup = new THREE.Group(); scene.add(headGroup);
 const headRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.016, 12, 48), new THREE.MeshBasicMaterial({ color: COL.coral }));
@@ -448,15 +477,24 @@ function drawFace(ex) {
     if (ex === "love") { g.fillStyle = C; heart(g, x, y, 20); g.fillStyle = W; }
     else if (ex === "dreamy" || (ex === "smug" && i === 1)) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
     else if (ex === "laugh") { g.moveTo(x - 16, y + 6); g.lineTo(x, y - 10); g.lineTo(x + 16, y + 6); g.stroke(); }
+    else if (ex === "wink" && i === 1) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+    else if (ex === "wow") { g.arc(x, y, 21, 0, Math.PI * 2); g.fill(); g.fillStyle = "#2a1418"; g.beginPath(); g.arc(x, y + 2, 8, 0, Math.PI * 2); g.fill(); g.fillStyle = W; }
+    else if (ex === "cool") { /* sunglasses are drawn after the eyes */ }
+    else if (ex === "dizzy") { g.lineWidth = 6; for (let a = 0; a < 15; a += 0.3) { const r = 1.5 + a * 1.25, px = x + r * Math.cos(a + i * 3), py = y + r * Math.sin(a + i * 3); a ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); g.lineWidth = 10; }
     else { g.arc(x, y, ex === "ooh" ? 15 : 12, 0, Math.PI * 2); g.fill(); }
   });
   g.lineWidth = 8;
-  eyes.forEach(([x, y], i) => { const lift = (ex === "smug" && i === 1) ? -14 : ex === "ooh" ? -10 : 0; const tl = ex === "focus" ? (i ? 8 : -8) : 0;
+  if (ex === "cool") { g.fillStyle = "#0b0f18"; g.strokeStyle = W; g.lineWidth = 6;
+    eyes.forEach(([x, y]) => { g.beginPath(); g.moveTo(x - 30, y - 16); g.lineTo(x + 30, y - 16); g.lineTo(x + 24, y + 12); g.quadraticCurveTo(x, y + 26, x - 24, y + 12); g.closePath(); g.fill(); g.stroke(); });
+    g.beginPath(); g.moveTo(122, 96); g.lineTo(134, 96); g.stroke(); g.fillStyle = W; g.lineWidth = 8; }
+  eyes.forEach(([x, y], i) => { if (ex === "cool") return; const lift = (ex === "smug" && i === 1) ? -14 : ex === "ooh" ? -10 : (ex === "wow" || ex === "dizzy") ? -20 : (ex === "wink" && i === 0) ? -8 : 0; const tl = ex === "focus" ? (i ? 8 : -8) : 0;
     g.beginPath(); g.moveTo(x - 18, y - 40 + lift - tl); g.lineTo(x + 18, y - 40 + lift + tl); g.stroke(); });
   g.lineWidth = 10; g.beginPath();
   if (ex === "laugh") { g.moveTo(90, 150); g.arc(128, 150, 38, Math.PI, 0, true); g.closePath(); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "ooh") { g.arc(128, 172, 18, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
-  else if (ex === "smug") { g.moveTo(96, 168); g.bezierCurveTo(124, 178, 146, 172, 164, 148); g.stroke(); }
+  else if (ex === "smug" || ex === "cool") { g.moveTo(96, 168); g.bezierCurveTo(124, 178, 146, 172, 164, 148); g.stroke(); }
+  else if (ex === "wow") { g.ellipse(128, 182, 22, 30, 0, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
+  else if (ex === "dizzy") { g.moveTo(92, 176); g.bezierCurveTo(104, 158, 116, 194, 128, 176); g.bezierCurveTo(140, 158, 152, 194, 164, 176); g.stroke(); }
   else if (ex === "focus") { g.moveTo(100, 160); g.lineTo(156, 160); g.stroke(); g.fillStyle = C; g.beginPath(); g.arc(140, 168, 12, 0, Math.PI); g.fill(); }
   else { g.arc(128, 136, 38, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); }
   g.fillStyle = "rgba(238,122,110,.55)"; [[62, 150], [194, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill(); });
@@ -500,14 +538,24 @@ function makeHand(arm) {
     const tip = new THREE.Mesh(SPH, mat); tip.scale.setScalar(r * 1.05); tip.position.y = -len; const kn = new THREE.Mesh(SPH, mat); kn.scale.setScalar(r * 1.05); piv.add(c, tip, kn); return piv; };
   const fingers = [-0.027, 0, 0.027].map((z, i) => { const a = bone(0.034, 0.0095), b = bone(0.03, 0.0088); a.position.set(0, -0.074, z); b.position.y = -0.034; a.add(b); g.add(a); return { a, b, fan: i - 1 }; });
   const ta = bone(0.03, 0.0105), tb = bone(0.026, 0.0095); ta.position.set(0, -0.03, 0.034); tb.position.y = -0.03; ta.add(tb); g.add(ta);
-  return { g, fingers, ta, tb, arm };
+  return { g, fingers, ta, tb, arm, glow };
 }
 const handL = makeHand(armL), handR = makeHand(armR);
 const _hq = new THREE.Quaternion();
-function setHand(h, open, turn) {        // open: 0 = fist, 1 = fingers spread; turn: degrees the palm rotates to face forward
+// hand signs: which of [index, middle, pinky] stay straight, and whether the thumb sticks out
+const SIGNS = { thumb: [[0, 0, 0], 1], point: [[1, 0, 0], 0], peace: [[1, 1, 0], 0], rock: [[1, 0, 1], 0] };
+function setHand(h, open, turn, sign) {        // open: 0 = fist, 1 = fingers spread; turn: degrees the palm rotates to face forward
   const a = h.arm; h.g.position.copy(W3(a.wr)); a.wr.getWorldQuaternion(h.g.quaternion);
   h.g.quaternion.multiply(_hq.setFromAxisAngle(UP, a.side * turn * D2R));
   const inward = -a.side;                // fingers curl toward the body
+  const sg = SIGNS[sign];
+  if (sg) {
+    for (const f of h.fingers) { const up = sg[0][1 - f.fan], c = up ? 0 : 1.55;                 // fan +1 is the index finger (next to the thumb)
+      f.a.rotation.set(up && sign === "peace" ? -f.fan * 0.22 - 0.11 : up && sign === "rock" ? -f.fan * 0.12 : 0, 0, inward * (0.05 + c * 0.95)); f.b.rotation.set(0, 0, inward * (0.04 + c)); }
+    if (sg[1]) { h.ta.rotation.set(-1.5, 0, 0); h.tb.rotation.set(0.12, 0, 0); }
+    else { h.ta.rotation.set(-0.2, 0, inward * 1.1); h.tb.rotation.set(0, 0, inward * 1.0); }
+    return;
+  }
   const curl = (1 - open) * 1.55, fan = Math.max(0, open - 0.4) * 0.75;
   for (const f of h.fingers) { f.a.rotation.set(-f.fan * fan, 0, inward * (0.12 + curl * 0.95)); f.b.rotation.set(0, 0, inward * (0.1 + curl)); }
   h.ta.rotation.set(-0.75 - fan * 0.9 + curl * 0.35, 0, inward * (0.15 + curl * 0.6)); h.tb.rotation.set(-curl * 0.5, 0, inward * curl * 0.7);
@@ -546,8 +594,8 @@ function poseCore(p0, bounce, ox, oz) {
   const pel = W3(root), hl = W3(hipL), hr = W3(hipR), c1 = W3(sp2), c2 = W3(sp3), ch = W3(chest), nb = W3(neckBase), n2 = W3(nk2), nk = W3(neckTop), hd = W3(headC);
   setSeg(S.hips, hl, hr, 0.02); setSpine([pel, c1, c2, ch, nb, n2, nk]);
   const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
-  setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setHand(handL, p.gL, p.aLt);
-  setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, p.gR, p.aRt);
+  setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setHand(handL, p.gL, p.aLt, p.handL);
+  setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, p.gR, p.aRt, p.handR);
   headGroup.position.copy(hd); headC.getWorldQuaternion(headGroup.quaternion);
   // legs: two-bone IK, knees bend toward the pelvis' facing
   const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6);
@@ -828,6 +876,7 @@ function poseAt(pos) {               // pos in half-beats, wraps over the 16 slo
   const k = ease(Math.min(1, into / Math.min(span, 1.6)));   // snap into each pose, then hold
   const A = slots[a], B = slots[b], out = {};
   for (const key in DEF) out[key] = A[key] + (B[key] - A[key]) * k;
+  out.handL = k > 0.5 ? B.handL : A.handL; out.handR = k > 0.5 ? B.handR : A.handR;
   return { pose: out, face: k > 0.5 ? B.face : A.face };
 }
 let shownFace = "smile";
