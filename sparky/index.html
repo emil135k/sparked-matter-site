@@ -63,6 +63,10 @@ button.primary { background: var(--teal); color: #04201c; border-color: var(--te
 button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); }
 .timeline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; }
 .trow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.syncrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--gold); border-radius: 12px; }
+.syncrow label { font-weight: 700; color: var(--gold); }
+.syncrow input[type=range] { flex: 1 1 220px; min-width: 160px; height: 32px; accent-color: var(--gold); }
+.syncrow output { font-family: var(--mono); font-size: 12px; min-width: 150px; }
 .slots { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; }
 .slot { padding: 8px 0; text-align: center; font-family: var(--mono); font-size: 12px; border-radius: 6px;
   background: #0f1a2a; border: 1px solid var(--line); color: var(--muted); }
@@ -124,6 +128,16 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
     </div>
 
     <div class="timeline">
+      <div class="syncrow" id="ownRow" hidden>
+        <label for="phase">Music timing</label>
+        <span class="small">◀ earlier</span>
+        <input type="range" id="phase" min="-4" max="4" step="0.01" value="0" aria-label="Slide the music earlier or later against the count">
+        <span class="small">later ▶</span>
+        <output id="phaseOut">0.00 beats</output>
+        <button id="phaseZero" title="Back to where the Studio first guessed">Reset</button>
+        <button id="ownLoop" class="on" title="On: repeat the music from the top. Off: play it once.">Loop</button>
+        <div class="small" id="ownInfo" style="flex-basis:100%"></div>
+      </div>
       <div class="trow">
         <button class="primary" id="play">▶ Play</button>
         <button id="metro" class="on">Click track</button>
@@ -155,21 +169,12 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <span class="small" id="trackCredit"></span>
         <span class="small" id="status">Sample routine loaded: 8 counts.</span>
       </div>
-      <div class="trow" id="ownRow" hidden>
-        <span class="small">Line up the count:</span>
-        <button id="oneBack" title="The 1 is one beat earlier">◀ move the 1</button>
-        <button id="oneFwd" title="The 1 is one beat later">move the 1 ▶</button>
-        <button id="halfBeat" title="Counts land in between the beats? Shift them half a beat">½ beat</button>
-        <button id="nudgeBack" title="Counts land late? Shift them 10 ms earlier">− 10 ms</button>
-        <button id="nudgeFwd" title="Counts land early? Shift them 10 ms later">+ 10 ms</button>
-        <button id="ownLoop" class="on" title="On: repeat the music from the top. Off: play it once.">Loop</button>
-        <span class="small" id="ownInfo"></span>
-      </div>
       <div class="slots" id="slots"></div>
       <div class="trow">
         <button id="savePose">Save again</button>
         <button id="clearPose">Clear count</button>
         <button id="clearAll">New routine</button>
+        <button id="sampleBtn" title="Bring back Sparky's built-in demo dance. This replaces the routine on screen.">Sparky's demo dance</button>
         <button id="copyCard">Copy dance card</button>
       </div>
     </div>
@@ -610,6 +615,7 @@ function paintSlots(playIdx = -1) { slotEls.forEach((b, i) => { b.classList.togg
 function setStatus(t) { document.getElementById("status").textContent = t; }
 document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
+document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
 document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", hw: P.hw }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
 
 // ---------- playback ----------
@@ -713,12 +719,26 @@ function findBeat(buf) {                 // returns { bpm, first }: tempo and th
   for (let bpm = top.bpm - 2.5; bpm <= top.bpm + 2.5; bpm += 0.02) { const per = 60 / bpm; for (let ph = 0; ph < per; ph += 0.005) { const sc = sharp(bpm, ph); if (sc > fine.s) fine = { s: sc, bpm, ph }; } }
   return { bpm: Math.round(fine.bpm * 100) / 100, first: fine.ph };
 }
-function ownFit() {                      // how many beats one pass of the music holds, in whole eight-counts when there's room
-  const T = TRACKS.own; if (!T) return; const P = 60 / bpm(), room = Math.floor((T.buf.duration - T.first) / P + 0.15);
+const phaseEl = document.getElementById("phase"), phaseOut = document.getElementById("phaseOut");
+function ownFit() {                      // apply the timing slider, then work out how many beats one pass of the music holds
+  const T = TRACKS.own; if (!T) return; const P = 60 / bpm(), eight = 8 * P;
+  // sliding "later" delays the music, so the count's 1 falls earlier in the file. Eight beats either way is the same count, so wrap.
+  let f = T.first0 - T.phase * P; const wrap = T.buf.duration > eight + 2 * P ? eight : P; f = ((f % wrap) + wrap) % wrap; T.first = f;
+  const room = Math.floor((T.buf.duration - T.first) / P + 0.15);
   T.loopBeats = room >= 8 ? Math.floor(room / 8) * 8 : Math.max(1, room);
-  ownInfo.textContent = `${T.name}: ${bpm()} BPM, the 1 at ${T.first.toFixed(2)} s, ${T.once ? "plays once" : "loops every " + T.loopBeats + " beats"}.`;
+  const ms = Math.round(Math.abs(T.phase) * P * 1000);
+  phaseOut.textContent = T.phase === 0 ? "as found" : `${Math.abs(T.phase).toFixed(2)} beats ${T.phase > 0 ? "later" : "earlier"} (${ms} ms)`;
+  ownInfo.textContent = `${T.name}: ${bpm()} BPM, ${T.once ? "plays once" : "loops every " + T.loopBeats + " beats"}. Slide until the lit number matches the count you hear.`;
+  try { localStorage.setItem("sparky-sync:" + T.name, JSON.stringify({ phase: T.phase, bpm: bpm() })); } catch (e) {}
 }
-function ownShift(sec) { const T = TRACKS.own; if (!T) return; const P = 60 / bpm(); let f = T.first + sec; while (f < 0) f += P; if (f > T.buf.duration - P) f = T.first; T.first = f; ownFit(); if (playing) { stopPlay(); startPlay(); } }
+function resyncTrack() {                 // re-aim the music at the count without stopping the dance
+  if (!playing || !actx || !trackBuf) return; const T = TRACKS[trackKey], P = 60 / bpm();
+  trackSrcs.forEach(x => { try { x.stop(); } catch (e) {} }); trackSrcs = [];
+  nextLoop = T.once ? 0 : Math.max(0, Math.floor((actx.currentTime - aStart + T.first) / (T.loopBeats * P)));
+  scheduleTrack();
+}
+let phaseT; phaseEl.addEventListener("input", () => { const T = TRACKS.own; if (!T) return; T.phase = parseFloat(phaseEl.value) || 0; ownFit(); clearTimeout(phaseT); phaseT = setTimeout(resyncTrack, 60); });
+document.getElementById("phaseZero").addEventListener("click", () => { phaseEl.value = 0; phaseEl.dispatchEvent(new Event("input")); });
 document.getElementById("ownBtn").addEventListener("click", () => ownFile.click());
 ownFile.addEventListener("change", async () => {
   const file = ownFile.files && ownFile.files[0]; ownFile.value = ""; if (!file) return;
@@ -728,21 +748,18 @@ ownFile.addEventListener("change", async () => {
     const buf = await new Promise((ok, no) => actx.decodeAudioData(raw, ok, no));
     await new Promise(r => setTimeout(r, 30));                       // let the "Listening…" note paint first
     const b = findBeat(buf), name = file.name.replace(/\.[^.]+$/, "");
-    TRACKS.own = { own: true, name, bpm: b.bpm, first: b.first, loopBeats: 8, buf, once: !document.getElementById("ownLoop").classList.contains("on"), credit: "Your file. It stays on this device." };
+    let saved = null; try { saved = JSON.parse(localStorage.getItem("sparky-sync:" + name) || "null"); } catch (e) {}
+    if (saved && saved.bpm) b.bpm = saved.bpm;
+    TRACKS.own = { own: true, name, bpm: b.bpm, first: b.first, first0: b.first, phase: saved && +saved.phase || 0, loopBeats: 8, buf, once: !document.getElementById("ownLoop").classList.contains("on"), credit: "Your file. It stays on this device." };
     const opt = trackSel.querySelector('option[value="own"]'); opt.hidden = false; opt.textContent = name; trackSel.value = "own";
-    trackKey = "own"; trackBuf = buf; document.getElementById("bpm").value = b.bpm; persist(); ownFit();
+    trackKey = "own"; trackBuf = buf; document.getElementById("bpm").value = b.bpm; persist(); phaseEl.value = TRACKS.own.phase; ownFit();
     if (beatOn) document.getElementById("beatBtn").click();
     creditEl.textContent = TRACKS.own.credit; ownRow.hidden = false;
-    setStatus(`${name} loaded at ${b.bpm} BPM. Press Play, then use "move the 1" until the count matches.`);
+    setStatus(`${name} loaded at ${b.bpm} BPM. Press Play, then slide Music timing until the count matches.`);
   } catch (e) { creditEl.textContent = "Couldn't read that file: " + (e && e.message || e); }
 });
-document.getElementById("oneBack").addEventListener("click", () => ownShift(-60 / bpm()));
-document.getElementById("oneFwd").addEventListener("click", () => ownShift(60 / bpm()));
-document.getElementById("halfBeat").addEventListener("click", () => ownShift(30 / bpm()));
-document.getElementById("nudgeBack").addEventListener("click", () => ownShift(-0.01));
-document.getElementById("nudgeFwd").addEventListener("click", () => ownShift(0.01));
-document.getElementById("ownLoop").addEventListener("click", e => { const on = e.currentTarget.classList.toggle("on"); if (TRACKS.own) { TRACKS.own.once = !on; ownFit(); if (playing) { stopPlay(); startPlay(); } } });
-document.getElementById("bpm").addEventListener("change", () => { if (trackKey === "own") ownFit(); });
+document.getElementById("ownLoop").addEventListener("click", e => { const on = e.currentTarget.classList.toggle("on"); if (TRACKS.own) { TRACKS.own.once = !on; ownFit(); resyncTrack(); } });
+document.getElementById("bpm").addEventListener("change", () => { if (trackKey === "own") { ownFit(); resyncTrack(); } });
 function schedule() {                                                               // keep ~0.12 s of steps queued on the audio clock
   if (!actx) return; const sp = 60 / bpm() / 4;
   while (aStart + nextStep * sp < actx.currentTime + 0.12) { playStep(nextStep, aStart + nextStep * sp); nextStep++; }
