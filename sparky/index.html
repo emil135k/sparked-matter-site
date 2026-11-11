@@ -144,7 +144,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button class="primary" id="play">▶ Play</button>
         <button id="metro" class="on">Click track</button>
         <button id="groove" class="on">Auto bounce</button>
-        <button id="lookBtn" title="Switch between the stick figure (best for working out moves) and the teddy bear (same moves, soft body, bouncy belly).">Look: stick figure</button>
+        <button id="lookBtn" title="Off: the bones, best for working out moves. On: the same bones wearing a teddy bear plushie suit, with a soft bouncy body.">Plushie suit: off</button>
         <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" step="0.01" style="width:80px">
       </div>
@@ -231,6 +231,8 @@ const GROUPS = [
     ["hx", "Slide", -0.3, 0.3, 0.01, 0], ["hz", "Pop fwd/back", -0.2, 0.2, 0.01, 0],
     ["hy", "Knee dip", 0, 0.55, 0.01, 0.03], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
     ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.13] ] },
+  { name: "Body build (whole dance)", cls: "hips", ctl: [
+    ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
   { name: "Spine", cls: "hips", ctl: [
     ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
   { name: "Shoulders", cls: "sh", ctl: [
@@ -264,7 +266,7 @@ GROUPS.forEach(g => {
   });
   controls.appendChild(fs);
 });
-const DIST = new Set(["gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+const DIST = new Set(["aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
 const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
@@ -273,13 +275,16 @@ const faceSel = document.getElementById("face");
 faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.face); liveSave(); });
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
 let liveT;
-function sameBody(hw) { slots.forEach(s => { if (s) s.hw = hw; }); }
-function unifyBody() {            // older routines may have mixed widths: keep the one that was changed from the default
-  const c = slots.find(s => s && Math.abs((s.hw ?? 0.13) - 0.13) > 1e-3); const hw = c ? c.hw : 0.13;
-  sameBody(hw); P.hw = hw; return hw;
+// the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
+const BODY = ["hw", "aLen", "lLen", "sLen"];
+const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
+function sameBody(src) { slots.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); }); }
+function unifyBody() {            // older routines may mix values: keep the one that was changed from the default
+  const b = {}; BODY.forEach(k => { const c = slots.find(s => s && Math.abs((s[k] ?? DEF[k]) - DEF[k]) > 1e-3); b[k] = c ? c[k] : DEF[k]; });
+  sameBody(b); Object.assign(P, b); return b.hw;
 }
 function liveSave() {
-  slots[sel] = { ...P }; sameBody(P.hw); paintSlots();
+  slots[sel] = { ...P }; sameBody(bodyOf(P)); paintSlots();
   setStatus(`Editing ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}. Changes save automatically.`);
   clearTimeout(liveT); liveT = setTimeout(persist, 200);
 }
@@ -334,7 +339,7 @@ let mix = true;
 document.getElementById("mixBtn").addEventListener("click", e => { mix = !mix; e.target.classList.toggle("on", mix); e.target.setAttribute("aria-pressed", mix);
   e.target.nextElementSibling.textContent = mix ? "On: each quick pose only changes the parts it uses, so you can stack them (legs first, then arms). Neutral starts over." : "Off: each quick pose replaces the whole body."; });
 Object.keys(PRESETS).forEach(n => { const b = document.createElement("button"); b.textContent = n;
-  b.addEventListener("click", () => { stopPlay(); P = (mix && n !== "Neutral") ? { ...P, ...PRESETS[n] } : { ...DEF, face: "smile", ...PRESETS[n], hw: P.hw }; syncUI(); drawFace(P.face); liveSave(); }); presetBox.appendChild(b); });
+  b.addEventListener("click", () => { stopPlay(); P = (mix && n !== "Neutral") ? { ...P, ...PRESETS[n] } : { ...DEF, face: "smile", ...PRESETS[n], ...bodyOf(P) }; syncUI(); drawFace(P.face); liveSave(); }); presetBox.appendChild(b); });
 
 // ---------- 3D ----------
 const canvas = document.getElementById("c");
@@ -538,7 +543,7 @@ function makeHand(arm) {
   const palm = new THREE.Mesh(SPH, mat); palm.scale.set(0.02, 0.043, 0.042); palm.position.y = -0.04; g.add(palm);
   const glow = new THREE.Mesh(SPH, glowMat(COL.gold, 0.16)); glow.scale.set(0.05, 0.085, 0.07); glow.position.y = -0.055; g.add(glow);
   const bone = (len, r) => { const piv = new THREE.Object3D(); const c = new THREE.Mesh(CYL, mat); c.scale.set(r, len, r); c.position.y = -len / 2;
-    const tip = new THREE.Mesh(SPH, mat); tip.scale.setScalar(r * 1.05); tip.position.y = -len; const kn = new THREE.Mesh(SPH, mat); kn.scale.setScalar(r * 1.05); piv.add(c, tip, kn); return piv; };
+    const tip = new THREE.Mesh(SPH, mat); tip.scale.setScalar(r * 1.05); tip.position.y = -len; const kn = new THREE.Mesh(SPH, mat); kn.scale.setScalar(r * 1.05); piv.add(c, tip, kn); piv.userData = { r, len, c, tip, kn }; return piv; };
   const fingers = [-0.027, 0, 0.027].map((z, i) => { const a = bone(0.034, 0.0095), b = bone(0.03, 0.0088); a.position.set(0, -0.074, z); b.position.y = -0.034; a.add(b); g.add(a); return { a, b, fan: i - 1 }; });
   const ta = bone(0.03, 0.0105), tb = bone(0.026, 0.0095); ta.position.set(0, -0.03, 0.034); tb.position.y = -0.03; ta.add(tb); g.add(ta);
   return { g, fingers, ta, tb, arm, glow, mat };
@@ -569,7 +574,10 @@ const W3 = o => o.getWorldPosition(new THREE.Vector3());
 const SIDEWAYS = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx", "fLx", "fRx"];
 function poseCore(p0, bounce, ox, oz) {
   const p = { ...p0 }; SIDEWAYS.forEach(k => p[k] = -(p0[k] || 0));
-  root.position.set(p.hx + ox, 0.98 - p.hy - bounce, p.hz + oz);
+  const LL = p.lLen ?? 1, AL = p.aLen ?? 1, SL = p.sLen ?? 1;
+  root.position.set(p.hx + ox, 0.04 + (0.94 - p.hy) * LL - bounce, p.hz + oz);
+  sp2.position.y = sp3.position.y = 0.17 * SL; chest.position.y = 0.16 * SL;
+  for (const a of [armL, armR]) { a.el.position.y = -0.27 * AL; a.wr.position.y = -0.25 * AL; }
   hipL.position.x = p.hw; hipR.position.x = -p.hw;
   root.rotation.set(0, p.hyaw * D2R, p.hroll * D2R, "YXZ");
   // spine: a single arc from hips to shoulders; it starts upright even when the hips tilt, so there is no S or kink
@@ -604,10 +612,10 @@ function poseCore(p0, bounce, ox, oz) {
   const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6);
   // feet stand a little wider than the hips; "knee up" lifts the foot up and forward so the thigh comes level (passé)
   const st = p.hw + 0.04;
-  const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45, p.fz * 0.5).addScaledVector(fwd, p.kL * 0.40);
-  const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45, -p.fz * 0.5).addScaledVector(fwd, p.kR * 0.40);
-  leg(hl, footL, fwd, S.thL, S.shinL, S.ftL);
-  leg(hr, footR, fwd, S.thR, S.shinR, S.ftR);
+  const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45 * LL, p.fz * 0.5).addScaledVector(fwd, p.kL * 0.40 * LL);
+  const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45 * LL, -p.fz * 0.5).addScaledVector(fwd, p.kR * 0.40 * LL);
+  leg(hl, footL, fwd, S.thL, S.shinL, S.ftL, 0.47 * LL);
+  leg(hr, footR, fwd, S.thR, S.shinR, S.ftR, 0.47 * LL);
   // eyes on hand: aim the face at the hand (turn + look up/down, measured from the chest), blended by the slider
   const wl = p0.lookL || 0, wr = p0.lookR || 0;
   if (!p0._aim && (wl > 0 || wr > 0)) {
@@ -659,8 +667,8 @@ function applyPose(p, bounce) {
   comMark(g);
 }
 const LEGS = {};
-function leg(h, f, fwd, sTh, sSh, sFt) {
-  const L = 0.47, v = new THREE.Vector3().subVectors(f, h); let d = Math.min(v.length(), 2 * L - 0.001);
+function leg(h, f, fwd, sTh, sSh, sFt, L) {
+  const v = new THREE.Vector3().subVectors(f, h); let d = Math.min(v.length(), 2 * L - 0.001);
   v.setLength(d); const foot = h.clone().add(v);
   const mid = h.clone().addScaledVector(v, 0.5); const ht = Math.sqrt(Math.max(0, L * L - (d / 2) ** 2));
   const perp = fwd.clone().sub(v.clone().normalize().multiplyScalar(fwd.dot(v) / d)).normalize();
@@ -695,7 +703,7 @@ function setStatus(t) { document.getElementById("status").textContent = t; }
 document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
 document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
-document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", hw: P.hw }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
+document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
 
 // ---------- playback ----------
 let playing = false, t0 = 0, metro = true, groove = true, actx = null, lastTick = -1;
@@ -890,13 +898,22 @@ const furMat = new THREE.MeshLambertMaterial({ color: 0xc98a4b }), creamMat = ne
 const SPH2 = new THREE.SphereGeometry(1, 32, 22), CYL2 = new THREE.CylinderGeometry(1, 1, 1, 22, 1, true);
 const plush = new THREE.Group(); plush.visible = false; scene.add(plush);
 const pm = (mat, parent) => { const m = new THREE.Mesh(SPH2, mat); (parent || plush).add(m); return m; };
-function plushLimb() { const c = new THREE.Mesh(CYL2, furMat); plush.add(c); return { c, a: pm(furMat), b: pm(furMat) }; }
-function setLimb(l, a, b, ra, rb) {
-  tmp.subVectors(b, a); const len = tmp.length(), r = (ra + rb) / 2; l.c.position.copy(a).addScaledVector(tmp, 0.5); l.c.scale.set(r, len, r);
-  l.c.quaternion.setFromUnitVectors(UP, tmp.clone().normalize()); l.a.position.copy(a); l.a.scale.setScalar(ra); l.b.position.copy(b); l.b.scale.setScalar(rb);
+// a limb is one smooth stuffed tube along a rounded curve through the joint, so it bends like a pillow with no hard knee or elbow
+const LIMB_SEG = 18, LIMB_RAD = 16;
+function plushLimb(r) {
+  const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(0, -0.4, 0));
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, LIMB_SEG, r, LIMB_RAD, false), furMat); tube.frustumCulled = false; plush.add(tube);
+  return { curve, tube, r, a: pm(furMat), b: pm(furMat) };
 }
-const PL = {}; ["uaL", "faL", "uaR", "faR", "thL", "shL", "thR", "shR"].forEach(k => PL[k] = plushLimb());
-const pBelly = pm(furMat), pChest = pm(furMat), pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
+function setLimb(l, a, j, b) {
+  l.curve.v0.copy(a); l.curve.v1.copy(j); l.curve.v2.copy(b);
+  const ng = new THREE.TubeGeometry(l.curve, LIMB_SEG, l.r, LIMB_RAD, false), g = l.tube.geometry;
+  g.attributes.position.array.set(ng.attributes.position.array); g.attributes.normal.array.set(ng.attributes.normal.array);
+  g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true; ng.dispose();
+  l.a.position.copy(a); l.a.scale.setScalar(l.r); l.b.position.copy(b); l.b.scale.setScalar(l.r);
+}
+const PL = { armL: plushLimb(0.095), armR: plushLimb(0.095), legL: plushLimb(0.13), legR: plushLimb(0.13) };
+const pBody = pm(furMat), pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
 const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
 { const sk = pm(furMat, pHead); sk.scale.set(0.2, 0.185, 0.19);
   for (const sx of [-1, 1]) { const e = pm(furMat, pHead); e.position.set(sx * 0.15, 0.15, -0.01); e.scale.setScalar(0.075);
@@ -905,25 +922,29 @@ const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
   const ns = pm(noseMat, pHead); ns.position.set(0, -0.008, 0.2); ns.scale.set(0.026, 0.019, 0.018); }
 const jig = { p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0, ready: false };
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pf = new THREE.Vector3(), _pu = new THREE.Vector3(), ZAX = new THREE.Vector3(0, 0, 1);
+const _px = new THREE.Vector3(), _pz = new THREE.Vector3(), _pm = new THREE.Matrix4();
 function plushUpdate(now) {
   if (!plushOn) return;
-  const pel = W3(root), ch = W3(chest); root.getWorldQuaternion(_pq); _pf.set(0, 0, 1).applyQuaternion(_pq); _pu.subVectors(ch, pel).normalize();
-  // arms and legs
-  for (const [a, k] of [[armL, "L"], [armR, "R"]]) { const sh = W3(a.sh), el = W3(a.el), wr = W3(a.wr); setLimb(PL["ua" + k], sh, el, 0.088, 0.078); setLimb(PL["fa" + k], el, wr, 0.078, 0.07); }
-  for (const k of ["L", "R"]) { const L = LEGS[k]; setLimb(PL["th" + k], L.hip, L.knee, 0.125, 0.1); setLimb(PL["sh" + k], L.knee, L.foot, 0.1, 0.088);
+  const pel = W3(root), ch = W3(chest); root.getWorldQuaternion(_pq); _pf.set(0, 0, 1).applyQuaternion(_pq);
+  const span = _pu.subVectors(ch, pel).length(); _pu.normalize();
+  // arms and legs: pillow tubes over the bones
+  for (const [a, k] of [[armL, "L"], [armR, "R"]]) setLimb(PL["arm" + k], W3(a.sh), W3(a.el), W3(a.wr));
+  for (const k of ["L", "R"]) { const L = LEGS[k]; setLimb(PL["leg" + k], L.hip, L.knee, L.foot);
     const d = _pv.subVectors(L.toe, L.foot).normalize(), f = pFoot[k], pad = pPad[k];
-    f.position.copy(L.foot).addScaledVector(d, 0.07); f.position.y += 0.04; f.scale.set(0.108, 0.08, 0.175); f.quaternion.setFromUnitVectors(ZAX, d);
-    pad.position.copy(L.foot).addScaledVector(d, 0.19); pad.position.y += 0.04; pad.scale.set(0.074, 0.058, 0.06); pad.quaternion.copy(f.quaternion); }
-  // belly on a spring: it lags the hips and settles after each hit, which is what makes it read as soft
-  const target = pel.clone().lerp(ch, 0.3), dt = Math.min(0.033, Math.max(0.001, (now - jig.t) / 1000)); jig.t = now;
+    f.position.copy(L.foot).addScaledVector(d, 0.07); f.position.y += 0.04; f.scale.set(0.115, 0.08, 0.18); f.quaternion.setFromUnitVectors(ZAX, d);
+    pad.position.copy(L.foot).addScaledVector(d, 0.195); pad.position.y += 0.04; pad.scale.set(0.078, 0.058, 0.06); pad.quaternion.copy(f.quaternion); }
+  // one pillow for the whole body, from under the hips to over the shoulders, leaning with the spine.
+  // It rides on a spring: it lags the hips and settles after each hit, which is what makes it read as soft.
+  const target = pel.clone().lerp(ch, 0.5), dt = Math.min(0.033, Math.max(0.001, (now - jig.t) / 1000)); jig.t = now;
   if (!jig.ready) { jig.p.copy(target); jig.v.set(0, 0, 0); jig.ready = true; }
   jig.v.addScaledVector(_pv.subVectors(target, jig.p), 190 * dt).multiplyScalar(Math.max(0, 1 - 9 * dt)); jig.p.addScaledVector(jig.v, dt);
   const off = _pv.subVectors(jig.p, target); if (off.length() > 0.07) { off.setLength(0.07); jig.p.copy(target).add(off); }
-  const sq = Math.max(0.86, Math.min(1.16, 1 + off.y * 2.4)), wd = 1 / Math.sqrt(sq), o = off.clone();
-  pBelly.position.copy(target).addScaledVector(o, 0.55); pBelly.quaternion.copy(_pq); pBelly.scale.set(0.3 * wd, 0.3 * sq, 0.27 * wd);
-  pTummy.position.copy(target).addScaledVector(_pf, 0.15).addScaledVector(o, 1.0); pTummy.quaternion.copy(_pq); pTummy.scale.set(0.2 * wd, 0.21 * sq, 0.14 * wd);
-  pChest.position.copy(ch).addScaledVector(_pu, -0.03); chest.getWorldQuaternion(pChest.quaternion); pChest.scale.set(0.24, 0.21, 0.21);
-  pTail.position.copy(pel).addScaledVector(_pf, -0.26).addScaledVector(o, 0.8); pTail.position.y += 0.03; pTail.scale.setScalar(0.06);
+  const sq = Math.max(0.88, Math.min(1.14, 1 + off.y * 2.2)), wd = 1 / Math.sqrt(sq), o = off.clone();
+  _px.crossVectors(_pu, _pf).normalize(); _pz.crossVectors(_px, _pu).normalize(); _pm.makeBasis(_px, _pu, _pz); _pq.setFromRotationMatrix(_pm);
+  const half = span / 2 + 0.2;
+  pBody.position.copy(target).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd, half * sq, 0.28 * wd);
+  pTummy.position.copy(target).addScaledVector(_pu, -0.04).addScaledVector(_pz, 0.165).addScaledVector(o, 1.0); pTummy.quaternion.copy(_pq); pTummy.scale.set(0.2 * wd, half * 0.62 * sq, 0.14 * wd);
+  pTail.position.copy(pel).addScaledVector(_pz, -0.27).addScaledVector(o, 0.8); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
 }
 function refreshLook() {
   const stick = !plushOn, glow = stick && !keyMode;
@@ -931,8 +952,14 @@ function refreshLook() {
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
   plush.visible = pHead.visible = plushOn; jig.ready = false;
   pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.position.set(0, plushOn ? 0.04 : 0, plushOn ? 0.3 : 0.121); facePlane.scale.setScalar(plushOn ? 2.03 : 1);
-  for (const h of [handL, handR]) { h.glow.visible = glow; plushOn ? h.g.scale.set(2.7, 2.2, 2.7) : h.g.scale.setScalar(1.55); const fk = plushOn ? 1.9 : 1; [...h.fingers.map(f => f.a), h.ta].forEach(o => o.scale.set(fk, 1, fk)); h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; }); }
-  const b = document.getElementById("lookBtn"); b.textContent = "Look: " + (plushOn ? "teddy bear" : "stick figure"); b.classList.toggle("on", plushOn);
+  for (const h of [handL, handR]) { h.glow.visible = glow; plushOn ? h.g.scale.set(2.9, 2.5, 2.9) : h.g.scale.setScalar(1.55);
+    // plushie hands are padded ski gloves: short, fat fingers you can still tell apart, with smooth rounded ends and no knuckles
+    h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; });
+    const fk = plushOn ? 2.3 : 1, fy = plushOn ? 0.72 : 1;
+    for (const top of [...h.fingers.map(f => f.a), h.ta]) { const kid = top.children[3]; kid.position.y = -top.userData.len * fy;
+      for (const piv of [top, kid]) { const { r, len, c, tip, kn } = piv.userData, rr = plushOn ? r * fk : r * 1.05;
+        c.scale.set(r * fk, len * fy, r * fk); c.position.y = -len * fy / 2; tip.position.y = -len * fy; tip.scale.setScalar(rr); kn.scale.setScalar(rr); } } }
+  const b = document.getElementById("lookBtn"); b.textContent = "Plushie suit: " + (plushOn ? "on" : "off"); b.classList.toggle("on", plushOn);
   drawFace(shownFace);
 }
 document.getElementById("lookBtn").addEventListener("click", () => { plushOn = !plushOn; try { localStorage.setItem("sparky-look", plushOn ? "bear" : "stick"); } catch (e) {} refreshLook(); });
@@ -1058,14 +1085,14 @@ function bvh() {
   const R3 = "CHANNELS 3 Zrotation Xrotation Yrotation";
   const chain = (ind, name, o, body) => `${ind}JOINT ${name}\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}\t${R3}\n${body}${ind}}\n`;
   const end = (ind, o) => `${ind}End Site\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}}\n`;
+  const B0 = bodyOf(slots.find(Boolean) || DEF), hw0 = B0.hw, cm = v => (v * 100).toFixed(2);
   const armTxt = (s, side) => chain("\t\t\t\t\t", side + "Shoulder", off(new THREE.Vector3(s * 0.21, 0.1, 0)),
-    chain("\t\t\t\t\t\t", side + "Elbow", "0.00 -27.00 0.00", chain("\t\t\t\t\t\t\t", side + "Wrist", "0.00 -25.00 0.00", end("\t\t\t\t\t\t\t\t", "0.00 -9.00 0.00"))));
-  const hw0 = (slots.find(Boolean) || DEF).hw || 0.13;
+    chain("\t\t\t\t\t\t", side + "Elbow", `0.00 ${cm(-0.27 * B0.aLen)} 0.00`, chain("\t\t\t\t\t\t\t", side + "Wrist", `0.00 ${cm(-0.25 * B0.aLen)} 0.00`, end("\t\t\t\t\t\t\t\t", "0.00 -9.00 0.00"))));
   const legTxt = (s, side) => chain("\t", side + "Hip", off(new THREE.Vector3(s * hw0, 0, 0)),
-    chain("\t\t", side + "Knee", "0.00 -47.00 0.00", chain("\t\t\t", side + "Ankle", "0.00 -47.00 0.00", end("\t\t\t\t", "0.00 0.00 11.00"))));
+    chain("\t\t", side + "Knee", `0.00 ${cm(-0.47 * B0.lLen)} 0.00`, chain("\t\t\t", side + "Ankle", `0.00 ${cm(-0.47 * B0.lLen)} 0.00`, end("\t\t\t\t", "0.00 0.00 11.00"))));
   let txt = "HIERARCHY\nROOT Hips\n{\n\tOFFSET 0.00 0.00 0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n" +
-    chain("\t", "Spine", "0.00 0.00 0.00", chain("\t\t", "Spine1", "0.00 17.00 0.00", chain("\t\t\t", "Spine2", "0.00 17.00 0.00",
-      chain("\t\t\t\t", "Chest", "0.00 16.00 0.00", chain("\t\t\t\t\t", "Neck", "0.00 10.00 0.00", chain("\t\t\t\t\t\t", "Neck1", "0.00 4.50 0.00", chain("\t\t\t\t\t\t\t", "Neck2", "0.00 4.50 0.00",
+    chain("\t", "Spine", "0.00 0.00 0.00", chain("\t\t", "Spine1", `0.00 ${cm(0.17 * B0.sLen)} 0.00`, chain("\t\t\t", "Spine2", `0.00 ${cm(0.17 * B0.sLen)} 0.00`,
+      chain("\t\t\t\t", "Chest", `0.00 ${cm(0.16 * B0.sLen)} 0.00`, chain("\t\t\t\t\t", "Neck", "0.00 10.00 0.00", chain("\t\t\t\t\t\t", "Neck1", "0.00 4.50 0.00", chain("\t\t\t\t\t\t\t", "Neck2", "0.00 4.50 0.00",
         chain("\t\t\t\t\t\t\t\t", "Head", "0.00 13.00 0.00", end("\t\t\t\t\t\t\t\t\t", "0.00 12.00 0.00"))))) +
       armTxt(1, "Left") + armTxt(-1, "Right"))))) + legTxt(1, "Left") + legTxt(-1, "Right") + "}\n";
   txt += `MOTION\nFrames: ${frames}\nFrame Time: ${(1 / fps).toFixed(6)}\n`;
