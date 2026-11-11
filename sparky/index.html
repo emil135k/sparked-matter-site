@@ -83,6 +83,9 @@ legend { font-family: var(--display); font-size: 15px; padding: 0 6px; }
 legend.hips { color: var(--teal); } legend.sh { color: var(--teal); } legend.arm { color: var(--gold); } legend.leg { color: var(--sky); } legend.head { color: var(--coral); }
 .ctl { display: grid; grid-template-columns: 96px minmax(0, 1fr) 42px; align-items: center; gap: 8px; }
 .ctl label { color: var(--muted); font-size: 12px; }
+.typeable { cursor: text; text-decoration: underline dotted; text-underline-offset: 3px; position: relative; }
+.typebox { position: absolute; right: -2px; top: 50%; transform: translateY(-50%); width: 84px; font: 16px var(--mono); padding: 4px 6px; text-align: right; z-index: 5;
+  color: var(--ink); background: var(--panel, #0d1a22); border: 1px solid var(--gold); border-radius: 8px; }
 .ctl output { font-family: var(--mono); font-size: 11px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--teal); }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -233,6 +236,8 @@ const GROUPS = [
     ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.13] ] },
   { name: "Body build (whole dance)", cls: "hips", ctl: [
     ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
+  { name: "Plushie suit (whole dance)", cls: "hips", ctl: [
+    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1] ] },
   { name: "Spine", cls: "hips", ctl: [
     ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
   { name: "Shoulders", cls: "sh", ctl: [
@@ -254,6 +259,21 @@ const DEF = {}; GROUPS.forEach(g => g.ctl.forEach(c => DEF[c[0]] = c[5]));
 let P = { ...DEF, face: "smile" };
 const inputs = {};
 const controls = document.getElementById("controls");
+// tap a slider's number to type an exact value
+function typeable(out, mn, mx, get, set) {
+  out.classList.add("typeable"); out.title = "Tap to type a number";
+  out.addEventListener("click", () => {
+    if (out.querySelector("input")) return;
+    const box = document.createElement("input"); box.type = "number"; box.inputMode = "decimal"; box.step = "any"; box.min = mn; box.max = mx;
+    box.value = +(+get()).toFixed(3); box.className = "typebox"; box.setAttribute("aria-label", "Type a value from " + mn + " to " + mx);
+    const old = out.textContent; out.textContent = ""; out.appendChild(box); box.focus(); box.select();
+    let done = false;
+    const finish = keep => { if (done) return; done = true; const v = parseFloat(box.value); out.textContent = old;
+      if (keep && Number.isFinite(v)) set(Math.max(mn, Math.min(mx, v))); };
+    box.addEventListener("keydown", e => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); e.stopPropagation(); });
+    box.addEventListener("blur", () => finish(true));
+  });
+}
 GROUPS.forEach(g => {
   const fs = document.createElement("fieldset");
   fs.innerHTML = `<legend class="${g.cls}">${g.name}</legend>`;
@@ -263,10 +283,11 @@ GROUPS.forEach(g => {
     fs.appendChild(row);
     const inp = row.querySelector("input"); inputs[k] = inp;
     inp.addEventListener("input", () => { P[k] = parseFloat(inp.value); showVal(k); stopPlay(); liveSave(); });
+    typeable(row.querySelector("output"), mn, mx, () => P[k], v => { P[k] = v; inp.value = v; showVal(k); stopPlay(); liveSave(); });
   });
   controls.appendChild(fs);
 });
-const DIST = new Set(["aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+const DIST = new Set(["jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
 const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
@@ -276,7 +297,7 @@ faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.fa
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
 let liveT;
 // the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
-const BODY = ["hw", "aLen", "lLen", "sLen"];
+const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
 function sameBody(src) { slots.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); }); }
 function unifyBody() {            // older routines may mix values: keep the one that was changed from the default
@@ -825,6 +846,7 @@ function resyncTrack() {                 // re-aim the music at the count withou
   scheduleTrack();
 }
 let phaseT; phaseEl.addEventListener("input", () => { const T = TRACKS.own; if (!T) return; T.phase = parseFloat(phaseEl.value) || 0; ownFit(); clearTimeout(phaseT); phaseT = setTimeout(resyncTrack, 60); });
+typeable(phaseOut, -4, 4, () => (TRACKS.own ? TRACKS.own.phase : 0), v => { phaseEl.value = v; phaseEl.dispatchEvent(new Event("input")); });
 document.getElementById("phaseZero").addEventListener("click", () => { phaseEl.value = 0; phaseEl.dispatchEvent(new Event("input")); });
 document.getElementById("ownBtn").addEventListener("click", () => ownFile.click());
 ownFile.addEventListener("change", async () => {
@@ -905,15 +927,40 @@ function plushLimb(r) {
   const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, LIMB_SEG, r, LIMB_RAD, false), furMat); tube.frustumCulled = false; plush.add(tube);
   return { curve, tube, r, a: pm(furMat), b: pm(furMat) };
 }
-function setLimb(l, a, j, b) {
+const _f1 = new THREE.Vector3(), _f2 = new THREE.Vector3(), _fin = new THREE.Vector3(), _fc = new THREE.Vector3();
+function setLimb(l, a, j, b, fold) {
   l.curve.v0.copy(a); l.curve.v1.copy(j); l.curve.v2.copy(b);
-  const ng = new THREE.TubeGeometry(l.curve, LIMB_SEG, l.r, LIMB_RAD, false), g = l.tube.geometry;
-  g.attributes.position.array.set(ng.attributes.position.array); g.attributes.normal.array.set(ng.attributes.normal.array);
-  g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true; ng.dispose();
+  const ng = new THREE.TubeGeometry(l.curve, LIMB_SEG, l.r, LIMB_RAD, false), g = l.tube.geometry, pos = g.attributes.position.array;
+  pos.set(ng.attributes.position.array); g.attributes.normal.array.set(ng.attributes.normal.array); ng.dispose();
+  // folds: where the limb bends, the stuffing creases on the inside of the joint and bunches into a roll on each side of the crease
+  const bend = _f1.subVectors(j, a).angleTo(_f2.subVectors(b, j)), amt = fold * Math.min(1, Math.max(0, bend - 0.2) / 1.5);
+  if (amt > 0.01) {
+    _fin.copy(a).add(b).multiplyScalar(0.5).sub(j).normalize();              // points into the crook of the elbow or knee
+    const ring = LIMB_RAD + 1;
+    for (let i = 0; i <= LIMB_SEG; i++) {
+      const t = i / LIMB_SEG - 0.5, crease = Math.exp(-((t / 0.07) ** 2)), rolls = Math.exp(-(((Math.abs(t) - 0.17) / 0.09) ** 2));
+      if (crease < 0.01 && rolls < 0.01) continue;
+      _fc.set(0, 0, 0); for (let k = 0; k < LIMB_RAD; k++) { const o = (i * ring + k) * 3; _fc.x += pos[o]; _fc.y += pos[o + 1]; _fc.z += pos[o + 2]; } _fc.multiplyScalar(1 / LIMB_RAD);
+      for (let k = 0; k < ring; k++) { const o = (i * ring + k) * 3, dx = pos[o] - _fc.x, dy = pos[o + 1] - _fc.y, dz = pos[o + 2] - _fc.z;
+        const inner = Math.max(0, (dx * _fin.x + dy * _fin.y + dz * _fin.z) / l.r), outer = 1 - inner;
+        const f = 1 + amt * (-0.55 * crease * inner + 0.3 * rolls * inner + 0.1 * crease * outer);
+        pos[o] = _fc.x + dx * f; pos[o + 1] = _fc.y + dy * f; pos[o + 2] = _fc.z + dz * f; }
+    }
+    g.computeVertexNormals();
+  }
+  g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true;
   l.a.position.copy(a); l.a.scale.setScalar(l.r); l.b.position.copy(b); l.b.scale.setScalar(l.r);
 }
 const PL = { armL: plushLimb(0.095), armR: plushLimb(0.095), legL: plushLimb(0.13), legR: plushLimb(0.13) };
-const pBody = pm(furMat), pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
+const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase = bodyGeo.attributes.position.array.slice();
+// the cream tummy is painted onto the body itself, so it creases and bunches with it
+{ const col = new Float32Array(bodyBase.length), fur = new THREE.Color(0xc98a4b), cream = new THREE.Color(0xf3dfb8), c = new THREE.Color();
+  for (let i = 0; i < bodyBase.length; i += 3) { const x = bodyBase[i], y = bodyBase[i + 1], z = bodyBase[i + 2];
+    const d = Math.hypot(x / 0.6, (y + 0.14) / 0.56), k = z > 0 ? Math.max(0, Math.min(1, (1 - d) / 0.05)) : 0;
+    c.copy(fur).lerp(cream, k); col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; }
+  bodyGeo.setAttribute("color", new THREE.BufferAttribute(col, 3)); }
+const pBody = new THREE.Mesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true })); plush.add(pBody);
+const pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
 const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
 { const sk = pm(furMat, pHead); sk.scale.set(0.2, 0.185, 0.19);
   for (const sx of [-1, 1]) { const e = pm(furMat, pHead); e.position.set(sx * 0.15, 0.15, -0.01); e.scale.setScalar(0.075);
@@ -922,14 +969,15 @@ const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
   const ns = pm(noseMat, pHead); ns.position.set(0, -0.008, 0.2); ns.scale.set(0.026, 0.019, 0.018); }
 const jig = { p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0, ready: false };
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pf = new THREE.Vector3(), _pu = new THREE.Vector3(), ZAX = new THREE.Vector3(0, 0, 1);
-const _px = new THREE.Vector3(), _pz = new THREE.Vector3(), _pm = new THREE.Matrix4();
+const _px = new THREE.Vector3(), _pz = new THREE.Vector3(), _pm = new THREE.Matrix4(), _pq2 = new THREE.Quaternion();
 function plushUpdate(now) {
   if (!plushOn) return;
+  const JIG = P.jig ?? 1, FOLD = P.fold ?? 1;
   const pel = W3(root), ch = W3(chest); root.getWorldQuaternion(_pq); _pf.set(0, 0, 1).applyQuaternion(_pq);
   const span = _pu.subVectors(ch, pel).length(); _pu.normalize();
   // arms and legs: pillow tubes over the bones
-  for (const [a, k] of [[armL, "L"], [armR, "R"]]) setLimb(PL["arm" + k], W3(a.sh), W3(a.el), W3(a.wr));
-  for (const k of ["L", "R"]) { const L = LEGS[k]; setLimb(PL["leg" + k], L.hip, L.knee, L.foot);
+  for (const [a, k] of [[armL, "L"], [armR, "R"]]) setLimb(PL["arm" + k], W3(a.sh), W3(a.el), W3(a.wr), FOLD);
+  for (const k of ["L", "R"]) { const L = LEGS[k]; setLimb(PL["leg" + k], L.hip, L.knee, L.foot, FOLD);
     const d = _pv.subVectors(L.toe, L.foot).normalize(), f = pFoot[k], pad = pPad[k];
     f.position.copy(L.foot).addScaledVector(d, 0.07); f.position.y += 0.04; f.scale.set(0.115, 0.08, 0.18); f.quaternion.setFromUnitVectors(ZAX, d);
     pad.position.copy(L.foot).addScaledVector(d, 0.195); pad.position.y += 0.04; pad.scale.set(0.078, 0.058, 0.06); pad.quaternion.copy(f.quaternion); }
@@ -939,11 +987,21 @@ function plushUpdate(now) {
   if (!jig.ready) { jig.p.copy(target); jig.v.set(0, 0, 0); jig.ready = true; }
   jig.v.addScaledVector(_pv.subVectors(target, jig.p), 190 * dt).multiplyScalar(Math.max(0, 1 - 9 * dt)); jig.p.addScaledVector(jig.v, dt);
   const off = _pv.subVectors(jig.p, target); if (off.length() > 0.07) { off.setLength(0.07); jig.p.copy(target).add(off); }
-  const sq = Math.max(0.88, Math.min(1.14, 1 + off.y * 2.2)), wd = 1 / Math.sqrt(sq), o = off.clone();
+  const o = off.clone().multiplyScalar(JIG), sq = Math.max(0.86, Math.min(1.16, 1 + o.y * 2.2)), wd = 1 / Math.sqrt(sq);
   _px.crossVectors(_pu, _pf).normalize(); _pz.crossVectors(_px, _pu).normalize(); _pm.makeBasis(_px, _pu, _pz); _pq.setFromRotationMatrix(_pm);
   const half = span / 2 + 0.2;
   pBody.position.copy(target).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd, half * sq, 0.28 * wd);
-  pTummy.position.copy(target).addScaledVector(_pu, -0.04).addScaledVector(_pz, 0.165).addScaledVector(o, 1.0); pTummy.quaternion.copy(_pq); pTummy.scale.set(0.2 * wd, half * 0.62 * sq, 0.14 * wd);
+  pTummy.position.copy(target).addScaledVector(_pu, -0.04).addScaledVector(_pz, 0.165).addScaledVector(o, 1.0); pTummy.visible = false;
+  // waist fold: when the spine bends, the pillow creases on the side it bends toward and bunches into a roll above and below
+  chest.getWorldQuaternion(_pq2); _f1.set(0, 1, 0).applyQuaternion(_pq2); root.getWorldQuaternion(_pq2); _f2.set(0, 1, 0).applyQuaternion(_pq2);
+  const lean = _f1.sub(_f2), leanAmt = lean.length(), bAmt = FOLD * Math.min(1, Math.max(0, leanAmt - 0.08) / 0.6), bp = bodyGeo.attributes.position.array;
+  if (bAmt > 0.01 || pBody.userData.folded) {
+    const lx = lean.dot(_px), lz = lean.dot(_pz), ll = Math.hypot(lx, lz) || 1, ux = lx / ll, uz = lz / ll;
+    for (let i = 0; i < bp.length; i += 3) { const x = bodyBase[i], y = bodyBase[i + 1], z = bodyBase[i + 2], rxz = Math.hypot(x, z) || 1;
+      const inner = Math.max(0, (x * ux + z * uz) / rxz), crease = Math.exp(-(((y + 0.1) / 0.1) ** 2)), rolls = Math.exp(-(((Math.abs(y + 0.1) - 0.24) / 0.13) ** 2));
+      const f = 1 + bAmt * inner * (-0.3 * crease + 0.14 * rolls); bp[i] = x * f; bp[i + 2] = z * f; }
+    bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals(); pBody.userData.folded = bAmt > 0.01;
+  }
   pTail.position.copy(pel).addScaledVector(_pz, -0.27).addScaledVector(o, 0.8); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
 }
 function refreshLook() {
