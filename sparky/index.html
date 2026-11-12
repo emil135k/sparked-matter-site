@@ -1282,8 +1282,29 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 </script>
 
 <script>
-// offline support: register the service worker (works on https, e.g. GitHub Pages, and on localhost)
-if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+// offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
+const APP_VERSION = "sparky-v15";
+(() => {
+  const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
+  tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
+  if (!("serviceWorker" in navigator)) return;
+  let reg = null, offered = false;
+  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").then(r => { reg = r; check(); }).catch(() => {}));
+  function offer(v) {
+    if (offered) return; offered = true;
+    const b = document.createElement("button"); b.id = "updateBtn"; b.textContent = "New version " + v.replace("sparky-v", "") + " is ready. Tap to update";
+    b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;padding:12px 18px;border-radius:999px;border:0;background:#f0c060;color:#2a1d00;font:600 15px system-ui;box-shadow:0 6px 24px rgba(0,0,0,.5)";
+    b.addEventListener("click", async () => { b.textContent = "Updating…"; try { if (reg) await reg.update(); } catch (e) {} location.reload(); });
+    document.body.appendChild(b);
+  }
+  // iPhones keep an installed web app alive in the background for days, so it never reloads by itself. Ask the site each time the app comes to the front.
+  async function check() {
+    try { const t = await (await fetch("./sw.js?check=" + Date.now(), { cache: "no-store" })).text(), m = t.match(/VERSION = "(sparky-v\d+)"/);
+      if (m && m[1] !== APP_VERSION && +m[1].slice(8) > +APP_VERSION.slice(8)) offer(m[1]); } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+  setInterval(() => { if (!document.hidden) check(); }, 10 * 60 * 1000);
+})();
 </script>
 </body>
 </html>

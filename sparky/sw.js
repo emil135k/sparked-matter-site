@@ -1,6 +1,6 @@
 // Sparky's Dance Studio service worker: keeps the app working offline.
 // Bump VERSION whenever you upload a new index.html so phones pick up the update.
-const VERSION = "sparky-v14";
+const VERSION = "sparky-v15";
 const CORE = ["./", "./index.html", "./three.min.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
@@ -17,7 +17,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   // the page itself: try the network first so updates show up, fall back to the saved copy offline
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(r => { const c = r.clone(); caches.open(VERSION).then(k => k.put("./index.html", c)); return r; })
+    e.respondWith(fetch(req, { cache: "no-store" }).then(r => { const c = r.clone(); caches.open(VERSION).then(k => k.put("./index.html", c)); return r; })
       .catch(() => caches.match("./index.html")));
     return;
   }
