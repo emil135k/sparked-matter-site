@@ -29,7 +29,7 @@
 [hidden] { display: none !important; }
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px; }
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px; padding-top: max(14px, env(safe-area-inset-top, 0px)); }
 .app { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; max-width: 1400px; margin: 0 auto; align-items: start; }
 .app > .panel { position: sticky; top: env(safe-area-inset-top, 0px); max-height: calc(100vh - 28px); }
 header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
@@ -287,6 +287,37 @@ GROUPS.forEach(g => {
   });
   controls.appendChild(fs);
 });
+{ const fs = document.createElement("fieldset"); fs.innerHTML = `<legend class="hips">Characters</legend>
+  <div class="trow" style="margin-bottom:8px"><label for="buildSel" class="small">Load</label>
+    <select id="buildSel" style="flex:1 1 150px"></select><button id="buildDel" title="Delete the selected saved character">Delete</button></div>
+  <div class="trow"><input id="buildName" type="text" maxlength="30" placeholder="Name this character" aria-label="Name for the current character" style="flex:1 1 150px; font-size:16px; padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink)">
+    <button id="buildSave" title="Save the current arm, leg and spine lengths, hip width, jiggle, folds and suit under this name">Save</button></div>
+  <div class="small" style="margin-top:6px">A character is the body: arm, leg and spine length, hip width, jiggle, folds and whether the plushie suit is on. It stays put when you load a dance or music.</div>`;
+  controls.prepend(fs); }
+const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, suit: false },
+                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, suit: true } };
+function userBuilds() { try { return JSON.parse(localStorage.getItem("sparky-builds") || "{}") || {}; } catch (e) { return {}; } }
+function fillBuilds(pick) {
+  const sel = document.getElementById("buildSel"), mine = userBuilds();
+  sel.innerHTML = '<option value="">Choose a character…</option>' + Object.keys(mine).map(n => `<option value="u:${n.replace(/"/g, "&quot;")}">${n.replace(/</g, "&lt;")}</option>`).join("") +
+    Object.keys(BUILTIN_BUILDS).map(n => `<option value="b:${n}">${n}</option>`).join("");
+  sel.value = pick || "";
+}
+function applyBuild(b) {
+  stopPlay(); Object.assign(P, bodyOf({ ...P, ...b })); sameBody(bodyOf(P)); saveBuild();
+  if (typeof b.suit === "boolean" && b.suit !== plushOn) { plushOn = b.suit; try { localStorage.setItem("sparky-look", plushOn ? "bear" : "stick"); } catch (e) {} refreshLook(); }
+  syncUI(); liveSave();
+}
+document.getElementById("buildSel").addEventListener("change", e => { const v = e.target.value; if (!v) return;
+  const b = v[0] === "b" ? BUILTIN_BUILDS[v.slice(2)] : userBuilds()[v.slice(2)]; if (b) { applyBuild(b); setStatus(v.slice(2) + " loaded."); } });
+document.getElementById("buildSave").addEventListener("click", () => { const box = document.getElementById("buildName"), n = box.value.trim();
+  if (!n) { setStatus("Type a name for this character first."); box.focus(); return; }
+  const mine = userBuilds(); mine[n] = { ...bodyOf(P), suit: plushOn }; try { localStorage.setItem("sparky-builds", JSON.stringify(mine)); } catch (e) {}
+  fillBuilds("u:" + n); box.value = ""; setStatus(`Saved "${n}". Pick it from the Characters list any time.`); });
+document.getElementById("buildDel").addEventListener("click", () => { const v = document.getElementById("buildSel").value;
+  if (!v || v[0] !== "u") { setStatus("Pick one of your saved characters to delete. The two built-in ones stay."); return; }
+  const mine = userBuilds(); delete mine[v.slice(2)]; try { localStorage.setItem("sparky-builds", JSON.stringify(mine)); } catch (e) {} fillBuilds(""); setStatus("Deleted."); });
+fillBuilds("");
 const DIST = new Set(["jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
@@ -300,12 +331,14 @@ let liveT;
 const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
 function sameBody(src) { slots.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); }); }
-function unifyBody() {            // older routines may mix values: keep the one that was changed from the default
-  const b = {}; BODY.forEach(k => { const c = slots.find(s => s && Math.abs((s[k] ?? DEF[k]) - DEF[k]) > 1e-3); b[k] = c ? c[k] : DEF[k]; });
-  sameBody(b); Object.assign(P, b); return b.hw;
+let BUILD = null; try { BUILD = JSON.parse(localStorage.getItem("sparky-build") || "null"); } catch (e) {}
+function saveBuild() { BUILD = bodyOf(P); try { localStorage.setItem("sparky-build", JSON.stringify(BUILD)); } catch (e) {} }
+function unifyBody() {            // the current character's build is applied to whatever dance is loaded, so loading a dance never resets the body
+  if (!BUILD) { BUILD = {}; BODY.forEach(k => { const c = slots.find(s => s && Math.abs((s[k] ?? DEF[k]) - DEF[k]) > 1e-3); BUILD[k] = c ? c[k] : DEF[k]; }); }
+  BUILD = bodyOf(BUILD); sameBody(BUILD); Object.assign(P, BUILD); return BUILD.hw;
 }
 function liveSave() {
-  slots[sel] = { ...P }; sameBody(bodyOf(P)); paintSlots();
+  slots[sel] = { ...P }; sameBody(bodyOf(P)); saveBuild(); paintSlots();
   setStatus(`Editing ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}. Changes save automatically.`);
   clearTimeout(liveT); liveT = setTimeout(persist, 200);
 }
@@ -567,7 +600,7 @@ function makeHand(arm) {
     const tip = new THREE.Mesh(SPH, mat); tip.scale.setScalar(r * 1.05); tip.position.y = -len; const kn = new THREE.Mesh(SPH, mat); kn.scale.setScalar(r * 1.05); piv.add(c, tip, kn); piv.userData = { r, len, c, tip, kn }; return piv; };
   const fingers = [-0.027, 0, 0.027].map((z, i) => { const a = bone(0.034, 0.0095), b = bone(0.03, 0.0088); a.position.set(0, -0.074, z); b.position.y = -0.034; a.add(b); g.add(a); return { a, b, fan: i - 1 }; });
   const ta = bone(0.03, 0.0105), tb = bone(0.026, 0.0095); ta.position.set(0, -0.03, 0.034); tb.position.y = -0.03; ta.add(tb); g.add(ta);
-  return { g, fingers, ta, tb, arm, glow, mat };
+  return { g, fingers, ta, tb, arm, glow, mat, palm };
 }
 const handL = makeHand(armL), handR = makeHand(armR);
 const _hq = new THREE.Quaternion();
@@ -943,13 +976,13 @@ function setLimb(l, a, j, b, fold) {
       _fc.set(0, 0, 0); for (let k = 0; k < LIMB_RAD; k++) { const o = (i * ring + k) * 3; _fc.x += pos[o]; _fc.y += pos[o + 1]; _fc.z += pos[o + 2]; } _fc.multiplyScalar(1 / LIMB_RAD);
       for (let k = 0; k < ring; k++) { const o = (i * ring + k) * 3, dx = pos[o] - _fc.x, dy = pos[o + 1] - _fc.y, dz = pos[o + 2] - _fc.z;
         const inner = Math.max(0, (dx * _fin.x + dy * _fin.y + dz * _fin.z) / l.r), outer = 1 - inner;
-        const f = 1 + amt * (-0.55 * crease * inner + 0.3 * rolls * inner + 0.1 * crease * outer);
+        const f = 1 + amt * (-0.42 * crease * inner + 0.16 * rolls * inner + 0.06 * crease * outer);
         pos[o] = _fc.x + dx * f; pos[o + 1] = _fc.y + dy * f; pos[o + 2] = _fc.z + dz * f; }
     }
     g.computeVertexNormals();
   }
   g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true;
-  l.a.position.copy(a); l.a.scale.setScalar(l.r); l.b.position.copy(b); l.b.scale.setScalar(l.r);
+  l.a.position.copy(a); l.a.scale.setScalar(l.r * 0.985); l.b.position.copy(b); l.b.scale.setScalar(l.r * 0.985);
 }
 const PL = { armL: plushLimb(0.095), armR: plushLimb(0.095), legL: plushLimb(0.13), legR: plushLimb(0.13) };
 const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase = bodyGeo.attributes.position.array.slice();
@@ -977,10 +1010,12 @@ function plushUpdate(now) {
   const span = _pu.subVectors(ch, pel).length(); _pu.normalize();
   // arms and legs: pillow tubes over the bones
   for (const [a, k] of [[armL, "L"], [armR, "R"]]) setLimb(PL["arm" + k], W3(a.sh), W3(a.el), W3(a.wr), FOLD);
-  for (const k of ["L", "R"]) { const L = LEGS[k]; setLimb(PL["leg" + k], L.hip, L.knee, L.foot, FOLD);
-    const d = _pv.subVectors(L.toe, L.foot).normalize(), f = pFoot[k], pad = pPad[k];
-    f.position.copy(L.foot).addScaledVector(d, 0.07); f.position.y += 0.04; f.scale.set(0.115, 0.08, 0.18); f.quaternion.setFromUnitVectors(ZAX, d);
-    pad.position.copy(L.foot).addScaledVector(d, 0.195); pad.position.y += 0.04; pad.scale.set(0.078, 0.058, 0.06); pad.quaternion.copy(f.quaternion); }
+  for (const k of ["L", "R"]) { const L = LEGS[k], f = pFoot[k], pad = pPad[k];
+    const ankle = L.knee.clone().sub(L.foot).normalize().multiplyScalar(0.1).add(L.foot);              // stop the leg just above the ankle, inside the foot
+    setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD);
+    const d = _pv.subVectors(L.toe, L.foot).normalize();
+    f.position.copy(L.foot).addScaledVector(d, 0.085); f.position.y += 0.068; f.scale.set(0.158, 0.098, 0.22); f.quaternion.setFromUnitVectors(ZAX, d);
+    pad.position.copy(L.foot).addScaledVector(d, 0.245); pad.position.y += 0.05; pad.scale.set(0.105, 0.07, 0.075); pad.quaternion.copy(f.quaternion); }
   // one pillow for the whole body, from under the hips to over the shoulders, leaning with the spine.
   // It rides on a spring: it lags the hips and settles after each hit, which is what makes it read as soft.
   const target = pel.clone().lerp(ch, 0.5), dt = Math.min(0.033, Math.max(0.001, (now - jig.t) / 1000)); jig.t = now;
@@ -1004,19 +1039,28 @@ function plushUpdate(now) {
   }
   pTail.position.copy(pel).addScaledVector(_pz, -0.27).addScaledVector(o, 0.8); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
 }
+// Stick hands are thin and knuckly. Plushie hands are paws: a round pad that continues the forearm, with three stubby digits and a thumb
+// that swell out of the pad and overlap each other, so they read as fingers but blend like a padded leather glove.
+function shapeBone(piv, r, len, cap) { const { c, tip, kn } = piv.userData; c.scale.set(r, len, r); c.position.y = -len / 2; tip.position.y = -len; tip.scale.setScalar(r * cap); kn.scale.setScalar(r * (cap > 1 ? cap : 0.97)); }
+function shapeHand(h) {
+  const z = [-1, 0, 1];
+  if (plushOn) {
+    h.g.scale.setScalar(1); h.palm.scale.set(0.088, 0.1, 0.128); h.palm.position.y = -0.07;
+    h.fingers.forEach((f, i) => { f.a.position.set(0, -0.128, z[i] * 0.072); shapeBone(f.a, 0.047, 0.04, 0.995); f.b.position.y = -0.04; shapeBone(f.b, 0.045, 0.03, 0.995); });
+    h.ta.position.set(0, -0.06, 0.1); shapeBone(h.ta, 0.046, 0.036, 0.995); h.tb.position.y = -0.036; shapeBone(h.tb, 0.043, 0.028, 0.995);
+  } else {
+    h.g.scale.setScalar(1.55); h.palm.scale.set(0.02, 0.043, 0.042); h.palm.position.y = -0.04;
+    h.fingers.forEach((f, i) => { f.a.position.set(0, -0.074, z[i] * 0.027); shapeBone(f.a, 0.0095, 0.034, 1.05); f.b.position.y = -0.034; shapeBone(f.b, 0.0088, 0.03, 1.05); });
+    h.ta.position.set(0, -0.03, 0.034); shapeBone(h.ta, 0.0105, 0.03, 1.05); h.tb.position.y = -0.03; shapeBone(h.tb, 0.0095, 0.026, 1.05);
+  }
+}
 function refreshLook() {
   const stick = !plushOn, glow = stick && !keyMode;
   for (const k in S) { S[k].core.visible = S[k].capA.visible = stick; S[k].glow.visible = glow; if (S[k].toeCap) S[k].toeCap.visible = stick; }
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
   plush.visible = pHead.visible = plushOn; jig.ready = false;
   pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.position.set(0, plushOn ? 0.04 : 0, plushOn ? 0.3 : 0.121); facePlane.scale.setScalar(plushOn ? 2.03 : 1);
-  for (const h of [handL, handR]) { h.glow.visible = glow; plushOn ? h.g.scale.set(2.9, 2.5, 2.9) : h.g.scale.setScalar(1.55);
-    // plushie hands are padded ski gloves: short, fat fingers you can still tell apart, with smooth rounded ends and no knuckles
-    h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; });
-    const fk = plushOn ? 2.3 : 1, fy = plushOn ? 0.72 : 1;
-    for (const top of [...h.fingers.map(f => f.a), h.ta]) { const kid = top.children[3]; kid.position.y = -top.userData.len * fy;
-      for (const piv of [top, kid]) { const { r, len, c, tip, kn } = piv.userData, rr = plushOn ? r * fk : r * 1.05;
-        c.scale.set(r * fk, len * fy, r * fk); c.position.y = -len * fy / 2; tip.position.y = -len * fy; tip.scale.setScalar(rr); kn.scale.setScalar(rr); } } }
+  for (const h of [handL, handR]) { h.glow.visible = glow; h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; }); shapeHand(h); }
   const b = document.getElementById("lookBtn"); b.textContent = "Plushie suit: " + (plushOn ? "on" : "off"); b.classList.toggle("on", plushOn);
   drawFace(shownFace);
 }
