@@ -1,6 +1,6 @@
 // Sparky's Dance Studio service worker: keeps the app working offline.
 // Bump VERSION whenever you upload a new index.html so phones pick up the update.
-const VERSION = "sparky-v13";
+const VERSION = "sparky-v14";
 const CORE = ["./", "./index.html", "./three.min.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 

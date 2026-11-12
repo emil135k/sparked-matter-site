@@ -73,6 +73,9 @@ button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); 
 .slot { padding: 8px 0; text-align: center; font-family: var(--mono); font-size: 12px; border-radius: 6px;
   background: #0f1a2a; border: 1px solid var(--line); color: var(--muted); }
 .slot.and { font-size: 10px; }
+.slot.fine { opacity: .5; font-style: italic; }
+.slots.fine-on .slot.fine, .slot.fine.filled, .slot.fine.sel, .slot.fine.play { opacity: 1; }
+.slot:nth-child(4n+1) { margin-left: 3px; }
 .slot.filled { background: #12333a; color: var(--teal); border-color: #1f5a5e; }
 .slot.sel { outline: 2px solid var(--gold); color: var(--ink); }
 .slot.play { background: var(--gold); color: #2a1d00; }
@@ -129,7 +132,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
       </div>
       <div class="countnow" id="countNow">1</div>
       <div class="coach" id="coach"><div class="cbig" id="cbig">1</div><div class="cstrip" id="cstrip"></div></div>
-      <div class="hint">Drag to spin · pinch or scroll to zoom · two fingers (or shift-drag) to pan up/down · gold dot = center of gravity (floor dot turns coral when he'd tip over)</div>
+      <div class="hint">Drag to spin · pinch or scroll to zoom · two fingers (or shift-drag) to slide the view any direction · gold dot = center of gravity (floor dot turns coral when he'd tip over)</div>
     </div>
 
     <div class="timeline">
@@ -339,7 +342,7 @@ function unifyBody() {            // the current character's build is applied to
 }
 function liveSave() {
   slots[sel] = { ...P }; sameBody(bodyOf(P)); saveBuild(); paintSlots();
-  setStatus(`Editing ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}. Changes save automatically.`);
+  setStatus(`Editing ${slotName(sel)}. Changes save automatically.`);
   clearTimeout(liveT); liveT = setTimeout(persist, 200);
 }
 
@@ -407,34 +410,38 @@ function resize() { const r = canvas.parentElement.getBoundingClientRect(); rend
 new ResizeObserver(resize).observe(canvas.parentElement);
 // orbit
 let drag = null, pinch = null; const ptrs = new Map();
-const clampDist = d => Math.max(1.2, Math.min(8, d));
+const clampDist = d => Math.max(0.7, Math.min(8, d));
 const clampTy = y => Math.max(0.1, Math.min(2.0, y));
 function midY() { const [a, b] = [...ptrs.values()]; return (a.y + b.y) / 2; }
+function midX() { const [a, b] = [...ptrs.values()]; return (a.x + b.x) / 2; }
+// slide the view: up and down, and sideways along whatever direction is "across the screen" from where the camera sits
+function panTo(t0, dx, dy) { const k = panK(), lim = v => Math.max(-1.6, Math.min(1.6, v));
+  target.set(lim(t0.x - Math.cos(az) * dx * k), clampTy(t0.y + dy * k), lim(t0.z + Math.sin(az) * dx * k)); }
 function panK() { return dist * 0.8 / Math.max(200, canvas.clientHeight); }
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 function gap() { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; }
 canvas.addEventListener("pointerdown", e => {
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
-  if (ptrs.size === 2) { drag = null; pinch = { d0: gap(), dist0: dist, my0: midY(), ty0: target.y }; }
-  else if (ptrs.size === 1) { drag = { x: e.clientX, y: e.clientY, az, el, ty0: target.y, pan: e.button === 2 || e.shiftKey }; canvas.style.cursor = drag.pan ? "ns-resize" : "grabbing"; }
+  if (ptrs.size === 2) { drag = null; pinch = { d0: gap(), dist0: dist, mx0: midX(), my0: midY(), t0: target.clone() }; }
+  else if (ptrs.size === 1) { drag = { x: e.clientX, y: e.clientY, az, el, t0: target.clone(), pan: e.button === 2 || e.shiftKey }; canvas.style.cursor = drag.pan ? "move" : "grabbing"; }
 });
 canvas.addEventListener("pointermove", e => {
   if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pinch && ptrs.size >= 2) { dist = clampDist(pinch.dist0 * pinch.d0 / gap()); target.y = clampTy(pinch.ty0 + (midY() - pinch.my0) * panK()); return; }
+  if (pinch && ptrs.size >= 2) { dist = clampDist(pinch.dist0 * pinch.d0 / gap()); panTo(pinch.t0, midX() - pinch.mx0, midY() - pinch.my0); return; }
   if (!drag) return;
-  if (drag.pan) { target.y = clampTy(drag.ty0 + (e.clientY - drag.y) * panK()); return; }
+  if (drag.pan) { panTo(drag.t0, e.clientX - drag.x, e.clientY - drag.y); return; }
   az = drag.az - (e.clientX - drag.x) * 0.008; el = Math.max(-0.2, Math.min(1.2, drag.el + (e.clientY - drag.y) * 0.006));
 });
 function ptrEnd(e) {
   ptrs.delete(e.pointerId);
   if (ptrs.size < 2) pinch = null;
-  if (ptrs.size === 1) { const p = [...ptrs.values()][0]; drag = { x: p.x, y: p.y, az, el, ty0: target.y, pan: false }; }
+  if (ptrs.size === 1) { const p = [...ptrs.values()][0]; drag = { x: p.x, y: p.y, az, el, t0: target.clone(), pan: false }; }
   if (ptrs.size === 0) { drag = null; canvas.style.cursor = "grab"; }
 }
 canvas.addEventListener("pointerup", ptrEnd); canvas.addEventListener("pointercancel", ptrEnd);
 canvas.addEventListener("gesturestart", e => e.preventDefault());
 canvas.addEventListener("wheel", e => { e.preventDefault(); dist = clampDist(dist * (1 + e.deltaY * 0.001)); }, { passive: false });
-document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.view; az = v === "front" ? 0 : v === "side" ? Math.PI / 2 : 0.6; el = 0.12; target.y = 1.0; dist = 4.4; }));
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.view; az = v === "front" ? 0 : v === "side" ? Math.PI / 2 : 0.6; el = 0.12; target.set(0, 1.0, 0); dist = 4.4; }));
 
 // floor
 const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.MeshBasicMaterial({ color: 0x0b1a24, transparent: true, opacity: 0.85 }));
@@ -738,23 +745,29 @@ function leg(h, f, fwd, sTh, sSh, sFt, L) {
 }
 
 // ---------- routine ----------
-const SLOT_N = 16; let slots = new Array(SLOT_N).fill(null); let sel = 0;
+// Four boxes per beat: the count, then "e", "&", "a". Eight beats, so 32 boxes. Empty boxes are skipped on playback.
+const SPB = 4, SLOT_N = 8 * SPB; let slots = new Array(SLOT_N).fill(null); let sel = 0;
+const SUBS = ["", "e", "&", "a"];
+const slotLabel = i => i % SPB ? SUBS[i % SPB] : String(i / SPB + 1);                                       // what the box shows
+const slotCode = i => (Math.floor(i / SPB) + 1) + SUBS[i % SPB];                                             // "3", "3e", "3&", "3a"
+const slotName = i => i % SPB ? `the ${SUBS[i % SPB] === "&" ? "&" : '"' + SUBS[i % SPB] + '"'} of ${Math.floor(i / SPB) + 1}` : `count ${i / SPB + 1}`;
+const grow16 = arr => { const out = new Array(SLOT_N).fill(null); arr.forEach((s, i) => { if (s && i * 2 < SLOT_N) out[i * 2] = s; }); return out; };   // dances saved before the "e" and "a" boxes existed
 const P_ = (o) => ({ ...DEF, face: "smile", ...o });
 const SAMPLE = [
   [0, P_(PRESETS["Hip pop L"])], [2, P_(PRESETS["Hip pop R"])], [4, P_({ ...PRESETS["Hip pop L"], face: "laugh" })], [6, P_({ ...PRESETS["Hip pop R"], face: "laugh" })],
   [8, P_(PRESETS["Body roll"])], [10, P_({ ...PRESETS["Body roll"], sl: -16, hz: 0.06, hnd: 8 })], [12, P_(PRESETS["Shimmy"])], [13, P_({ ...PRESETS["Shimmy"], syaw: -25, shL: 0, shR: 0.06 })],
   [14, P_(PRESETS["Jazz hands"])], [15, P_(PRESETS["Heart"])] ];
-function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i] = p); }
-try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && saved.slots) { slots = saved.slots.map(s => s && { ...DEF, face: "smile", ...s }); document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
+function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); }
+try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && saved.slots) { slots = saved.slots.map(s => s && { ...DEF, face: "smile", ...s }); if (slots.length !== SLOT_N) slots = grow16(slots); document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
 function persist() { try { localStorage.setItem("sparky-routine", JSON.stringify({ bpm: bpm(), slots })); } catch (e) {} }
 const slotBox = document.getElementById("slots"); const slotEls = [];
-for (let i = 0; i < SLOT_N; i++) { const b = document.createElement("button"); b.className = "slot" + (i % 2 ? " and" : ""); b.textContent = i % 2 ? "&" : String(i / 2 + 1);
-  b.setAttribute("aria-label", i % 2 ? `and of ${Math.floor(i / 2) + 1}` : `count ${i / 2 + 1}`);
+for (let i = 0; i < SLOT_N; i++) { const b = document.createElement("button"); b.className = "slot" + (i % SPB ? " and" : "") + (i % 2 ? " fine" : ""); b.textContent = slotLabel(i);
+  b.setAttribute("aria-label", slotName(i));
   b.addEventListener("click", () => { stopPlay(); sel = i; if (slots[i]) { P = { ...slots[i] }; syncUI(); drawFace(P.face); } paintSlots(); });
   slotBox.appendChild(b); slotEls.push(b); }
 function paintSlots(playIdx = -1) { slotEls.forEach((b, i) => { b.classList.toggle("filled", !!slots[i]); b.classList.toggle("sel", i === sel); b.classList.toggle("play", i === playIdx); }); }
 function setStatus(t) { document.getElementById("status").textContent = t; }
-document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${sel % 2 ? "the & of " + (Math.floor(sel / 2) + 1) : "count " + (sel / 2 + 1)}.`); });
+document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${slotName(sel)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
 document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
 document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
@@ -775,7 +788,7 @@ function buildStrip(n) {
   const parts = LEVELS[lvl] || []; cstrip.innerHTML = "";
   parts.forEach(([f, lab]) => { const sp = document.createElement("span"); sp.textContent = f ? lab : n; sp.dataset.f = f; if (f) sp.className = "sub"; cstrip.appendChild(sp); });
 }
-function setLevel(v) { lvl = v; coachEl.classList.toggle("on", lvl > 0); buildStrip(1); }
+function setLevel(v) { lvl = v; coachEl.classList.toggle("on", lvl > 0); buildStrip(1); slotBox.classList.toggle("fine-on", lvl >= 3); }
 document.getElementById("countLvl").addEventListener("change", e => setLevel(+e.target.value));
 document.getElementById("beatBtn").addEventListener("click", e => { beatOn = !beatOn; e.target.classList.toggle("on", beatOn); if (beatOn && !lvl) { document.getElementById("countLvl").value = "2"; setLevel(2); } });
 document.getElementById("countIn").addEventListener("click", e => { countIn = !countIn; e.target.classList.toggle("on", countIn); });
@@ -932,14 +945,14 @@ function tick(accent) { if (!actx) return; const o = actx.createOscillator(), g 
   g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(accent ? 0.25 : 0.12, actx.currentTime + 0.002);
   g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.06); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.07); }
 const ease = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
-function poseAt(pos) {               // pos in half-beats, wraps over the 16 slots
+function poseAt(pos) {               // pos in boxes (quarter-beats), wraps over the 32 boxes
   const keys = slots.map((s, i) => s ? i : -1).filter(i => i >= 0);
   if (keys.length === 1) return { pose: slots[keys[0]], face: slots[keys[0]].face };
   const p = pos % SLOT_N; let a = keys[keys.length - 1], b = keys[0];
   for (let i = 0; i < keys.length; i++) { if (keys[i] <= p) a = keys[i]; }
   const ai = keys.indexOf(a); b = keys[(ai + 1) % keys.length];
   let span = (b - a + SLOT_N) % SLOT_N || SLOT_N, into = (p - a + SLOT_N) % SLOT_N;
-  const k = ease(Math.min(1, into / Math.min(span, 1.6)));   // snap into each pose, then hold
+  const k = ease(Math.min(1, into / Math.min(span, 3.2)));   // snap into each pose, then hold (a move one box away arrives in one box)
   const A = slots[a], B = slots[b], out = {};
   for (const key in DEF) out[key] = A[key] + (B[key] - A[key]) * k;
   out.handL = k > 0.5 ? B.handL : A.handL; out.handR = k > 0.5 ? B.handR : A.handR;
@@ -1098,19 +1111,19 @@ function frame(now) {
   let bounce = 0, p = P, beats = 0;
   if (playing) {
     const useAudio = actx && (metro || beatOn || lvl || trackBuf); if (useAudio) schedule();
-    beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; const pos = Math.max(0, beats) * 2;
+    beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; const pos = Math.max(0, beats) * SPB;
     if (slots.some(Boolean)) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
     // bounce follows the counting level: once a beat for "1 2 3 4", on every half beat otherwise
     const bf = lvl === 1 ? 2 : 4;
     if (groove && beats >= 0) bounce = 0.025 * (0.5 + 0.5 * Math.cos(bf * Math.PI * beats)) ** 2;
     const ti = Math.floor(beats); if (!useAudio && ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
-    paintSlots(beats < 0 ? -1 : Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && (pos % 2) >= 1 ? " &" : "");
+    paintSlots(beats < 0 ? -1 : Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && Math.floor(pos) % SPB ? " " + SUBS[Math.floor(pos) % SPB] : "");
     showCoach(beats);
     rings.forEach((r, i) => { const ph = (((beats - i * 0.33) % 1) + 1) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
   } else {
     if (P.face !== shownFace) { shownFace = P.face; drawFace(shownFace); }
     rings.forEach(r => r.material.opacity = 0);
-    document.getElementById("countNow").textContent = sel % 2 ? (Math.floor(sel / 2) + 1) + " &" : String(sel / 2 + 1);
+    document.getElementById("countNow").textContent = (Math.floor(sel / SPB) + 1) + (sel % SPB ? " " + SUBS[sel % SPB] : "");
   }
   applyPose(p, bounce); plushUpdate(now);
   const tsec = now / 1000;
@@ -1120,7 +1133,7 @@ function frame(now) {
 
 // ---------- dance card in/out ----------
 function card() {
-  const counts = slots.map((s, i) => s && { count: i % 2 ? `${Math.floor(i / 2) + 1}&` : `${i / 2 + 1}`, ...Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) }).filter(Boolean);
+  const counts = slots.map((s, i) => s && { count: slotCode(i), ...Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) }).filter(Boolean);
   return JSON.stringify({ rig: "sparky-dance-rig/1", bpm: bpm(), counts }, null, 1);
 }
 document.getElementById("copyCard").addEventListener("click", () => {
@@ -1130,7 +1143,7 @@ document.getElementById("copyCard").addEventListener("click", () => {
 });
 document.getElementById("loadCard").addEventListener("click", () => {
   try { const d = JSON.parse(document.getElementById("cardIn").value); const ns = new Array(SLOT_N).fill(null);
-    (d.counts || []).forEach(c => { const m = String(c.count).match(/^(\d+)(&?)$/); if (!m) return; const i = (parseInt(m[1]) - 1) * 2 + (m[2] ? 1 : 0); if (i >= 0 && i < SLOT_N) { const { count, ...rest } = c; ns[i] = { ...DEF, face: "smile", ...rest }; } });
+    (d.counts || []).forEach(c => { const m = String(c.count).match(/^(\d+)([e&a]?)$/); if (!m) return; const i = (parseInt(m[1]) - 1) * SPB + SUBS.indexOf(m[2]); if (i >= 0 && i < SLOT_N) { const { count, ...rest } = c; ns[i] = { ...DEF, face: "smile", ...rest }; } });
     slots = ns; unifyBody(); syncUI(); if (d.bpm) document.getElementById("bpm").value = d.bpm; persist(); paintSlots(); toast("Dance card loaded.");
   } catch (e) { toast("That doesn't look like a dance card. Copy one from the rig and try again."); }
 });
@@ -1158,8 +1171,8 @@ function drawStaff(playIdx = -1) {
   lines.forEach(([y, n]) => { g.strokeStyle = "#1d2a3d"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, base - y * sc); g.lineTo(w, base - y * sc); g.stroke(); });
   for (let i = 0; i < SLOT_N; i++) {
     const cx = colW * (i + 0.5);
-    if (i % 2 === 0) { g.strokeStyle = "#2a3a52"; g.beginPath(); g.moveTo(colW * i, 4); g.lineTo(colW * i, base + 4); g.stroke(); }
-    g.fillStyle = i === playIdx ? "#f0c060" : "#8796ab"; g.textAlign = "center"; g.fillText(i % 2 ? "&" : String(i / 2 + 1), cx, h - 9);
+    if (i % SPB === 0) { g.strokeStyle = "#2a3a52"; g.beginPath(); g.moveTo(colW * i, 4); g.lineTo(colW * i, base + 4); g.stroke(); }
+    g.fillStyle = i === playIdx ? "#f0c060" : "#8796ab"; g.textAlign = "center"; if (i % 2 === 0 || colW > 16 || i === playIdx) g.fillText(slotLabel(i), cx, h - 9);
     const c = scoreCache[i]; if (!c) continue;
     const j = c.j, X = v => cx + v.x * sc * 0.9, Y = v => base - v.y * sc;
     const path = (pts, col) => { g.strokeStyle = col; g.lineWidth = 2; g.lineCap = "round"; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))); g.stroke(); };
@@ -1187,7 +1200,7 @@ const LIMBS = [["Head", "nk", "hd"], ["Neck", "nb", "nk"], ["Trunk", "pel", "ch"
   ["R upper arm", "shR", "elR"], ["R forearm", "elR", "wrR"], ["L thigh", "hiL", "knL"], ["L shin", "knL", "ftL"], ["R thigh", "hiR", "knR"], ["R shin", "knR", "ftR"]];
 function drawGrid() {
   const el = document.getElementById("grid");
-  let html = `<table><thead><tr><th scope="col">Limb</th>${Array.from({ length: SLOT_N }, (_, i) => `<th scope="col">${i % 2 ? "&" : i / 2 + 1}</th>`).join("")}</tr></thead><tbody>`;
+  let html = `<table><thead><tr><th scope="col">Limb</th>${Array.from({ length: SLOT_N }, (_, i) => `<th scope="col">${slotLabel(i)}</th>`).join("")}</tr></thead><tbody>`;
   LIMBS.forEach(([name, a, b]) => {
     html += `<tr><th scope="row">${name}</th>`;
     let prev = null;
@@ -1210,7 +1223,7 @@ new ResizeObserver(() => drawStaff()).observe(staff);
 
 // BVH: skeleton hierarchy + one row of channel values per frame (centimetres, ZXY degrees)
 function bvh() {
-  const fps = 30, beats = SLOT_N / 2, frames = Math.round(beats * 60 / bpm() * fps);
+  const fps = 30, beats = SLOT_N / SPB, frames = Math.round(beats * 60 / bpm() * fps);
   const off = (o) => `${(o.x * 100).toFixed(2)} ${(o.y * 100).toFixed(2)} ${(o.z * 100).toFixed(2)}`;
   const R3 = "CHANNELS 3 Zrotation Xrotation Yrotation";
   const chain = (ind, name, o, body) => `${ind}JOINT ${name}\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}\t${R3}\n${body}${ind}}\n`;
@@ -1242,7 +1255,7 @@ function bvh() {
   };
   const ident = new THREE.Quaternion();
   for (let f = 0; f < frames; f++) {
-    const b = f / fps * bpm() / 60, r = poseAt(b * 2);
+    const b = f / fps * bpm() / 60, r = poseAt(b * SPB);
     applyPose(r.pose, groove ? 0.025 * (0.5 + 0.5 * Math.cos(4 * Math.PI * b)) ** 2 : 0);
     const row = [off(root.position), rot(root.quaternion), rot(sp1.quaternion), rot(sp2.quaternion), rot(sp3.quaternion), rot(chest.quaternion), rot(neckBase.quaternion), rot(nk2.quaternion), rot(neckTop.quaternion), rot(ident)];
     for (const a of [armL, armR]) row.push(rot(a.sh.quaternion), rot(a.el.quaternion), rot(a.wr.quaternion));
