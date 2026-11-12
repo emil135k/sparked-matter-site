@@ -72,6 +72,11 @@ button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); 
 .slots { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; }
 .slot { padding: 8px 0; text-align: center; font-family: var(--mono); font-size: 12px; border-radius: 6px;
   background: #0f1a2a; border: 1px solid var(--line); color: var(--muted); }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button { min-width: 38px; padding: 8px 0; font-family: var(--mono); }
+.tabs button.on { background: var(--gold); color: #2a1d00; border-color: var(--gold); }
+.tabs button.play { outline: 2px solid var(--teal); }
+.tabs button.empty { opacity: .55; }
 .slot.and { font-size: 10px; }
 .slot.fine { opacity: .5; font-style: italic; }
 .slots.fine-on .slot.fine, .slot.fine.filled, .slot.fine.sel, .slot.fine.play { opacity: 1; }
@@ -179,6 +184,13 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <span class="small" id="trackCredit"></span>
         <span class="small" id="status">Sample routine loaded: 8 counts.</span>
       </div>
+      <div class="trow" id="pageRow">
+        <label for="pageN" class="small">Eight-counts in this dance:</label>
+        <input id="pageN" type="number" min="1" max="16" value="1" inputmode="numeric" aria-describedby="pageHelp" style="width:64px; font-size:16px">
+        <div id="pageTabs" class="tabs" role="group" aria-label="Which eight-count you are editing"></div>
+        <button id="pageCopy" title="Make a copy of this eight-count right after it, so you can change a few moves instead of starting over">Copy to a new one</button>
+      </div>
+      <div class="small" id="pageHelp" style="margin:-2px 0 8px">Play runs through them in order and starts over. Tap a number to edit that eight-count.</div>
       <div class="slots" id="slots"></div>
       <div class="trow">
         <button id="savePose">Save again</button>
@@ -333,7 +345,7 @@ let liveT;
 // the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
 const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
-function sameBody(src) { slots.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); }); }
+function sameBody(src) { pages.forEach(q => q.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); })); }
 let BUILD = null; try { BUILD = JSON.parse(localStorage.getItem("sparky-build") || "null"); } catch (e) {}
 function saveBuild() { BUILD = bodyOf(P); try { localStorage.setItem("sparky-build", JSON.stringify(BUILD)); } catch (e) {} }
 function unifyBody() {            // the current character's build is applied to whatever dance is loaded, so loading a dance never resets the body
@@ -747,6 +759,9 @@ function leg(h, f, fwd, sTh, sSh, sFt, L) {
 // ---------- routine ----------
 // Four boxes per beat: the count, then "e", "&", "a". Eight beats, so 32 boxes. Empty boxes are skipped on playback.
 const SPB = 4, SLOT_N = 8 * SPB; let slots = new Array(SLOT_N).fill(null); let sel = 0;
+// A dance is one or more eight-counts ("pages"). `slots` is always the page being edited: pages[pg].
+let pages = [slots], pg = 0; const MAX_PAGES = 16;
+const anyPose = () => pages.some(q => q.some(Boolean));
 const SUBS = ["", "e", "&", "a"];
 const slotLabel = i => i % SPB ? SUBS[i % SPB] : String(i / SPB + 1);                                       // what the box shows
 const slotCode = i => (Math.floor(i / SPB) + 1) + SUBS[i % SPB];                                             // "3", "3e", "3&", "3a"
@@ -757,20 +772,48 @@ const SAMPLE = [
   [0, P_(PRESETS["Hip pop L"])], [2, P_(PRESETS["Hip pop R"])], [4, P_({ ...PRESETS["Hip pop L"], face: "laugh" })], [6, P_({ ...PRESETS["Hip pop R"], face: "laugh" })],
   [8, P_(PRESETS["Body roll"])], [10, P_({ ...PRESETS["Body roll"], sl: -16, hz: 0.06, hnd: 8 })], [12, P_(PRESETS["Shimmy"])], [13, P_({ ...PRESETS["Shimmy"], syaw: -25, shL: 0, shR: 0.06 })],
   [14, P_(PRESETS["Jazz hands"])], [15, P_(PRESETS["Heart"])] ];
-function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); }
-try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && saved.slots) { slots = saved.slots.map(s => s && { ...DEF, face: "smile", ...s }); if (slots.length !== SLOT_N) slots = grow16(slots); document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
-function persist() { try { localStorage.setItem("sparky-routine", JSON.stringify({ bpm: bpm(), slots })); } catch (e) {} }
+function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); pages = [slots]; pg = 0; }
+try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && (saved.pages || saved.slots)) { const fix = arr => { let q = arr.map(s => s && { ...DEF, face: "smile", ...s }); return q.length !== SLOT_N ? grow16(q) : q; };
+  pages = (saved.pages && saved.pages.length ? saved.pages : [saved.slots]).slice(0, MAX_PAGES).map(fix); pg = 0; slots = pages[0]; document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
+function persist() { try { localStorage.setItem("sparky-routine", JSON.stringify({ bpm: bpm(), pages, slots: pages[0] })); } catch (e) {} }
 const slotBox = document.getElementById("slots"); const slotEls = [];
 for (let i = 0; i < SLOT_N; i++) { const b = document.createElement("button"); b.className = "slot" + (i % SPB ? " and" : "") + (i % 2 ? " fine" : ""); b.textContent = slotLabel(i);
   b.setAttribute("aria-label", slotName(i));
   b.addEventListener("click", () => { stopPlay(); sel = i; if (slots[i]) { P = { ...slots[i] }; syncUI(); drawFace(P.face); } paintSlots(); });
   slotBox.appendChild(b); slotEls.push(b); }
-function paintSlots(playIdx = -1) { slotEls.forEach((b, i) => { b.classList.toggle("filled", !!slots[i]); b.classList.toggle("sel", i === sel); b.classList.toggle("play", i === playIdx); }); }
+// playIdx counts boxes through the whole dance; the page being played is brought into view as the dance reaches it
+function paintSlots(playIdx = -1) {
+  const playPage = playIdx < 0 ? -1 : Math.floor(playIdx / SLOT_N) % pages.length, local = playIdx < 0 ? -1 : playIdx % SLOT_N;
+  if (playPage >= 0 && playPage !== pg) showPage(playPage, true);
+  slotEls.forEach((b, i) => { b.classList.toggle("filled", !!slots[i]); b.classList.toggle("sel", i === sel); b.classList.toggle("play", i === local); });
+  [...pageTabs.children].forEach((b, i) => { b.classList.toggle("on", i === pg); b.classList.toggle("play", i === playPage); b.classList.toggle("empty", !pages[i].some(Boolean)); });
+}
+const pageTabs = document.getElementById("pageTabs"), pageN = document.getElementById("pageN");
+function drawTabs() {
+  pageTabs.innerHTML = ""; pageN.value = pages.length; pageTabs.hidden = pages.length < 2;
+  pages.forEach((_, i) => { const b = document.createElement("button"); b.textContent = i + 1; b.setAttribute("aria-label", "Eight-count " + (i + 1)); b.addEventListener("click", () => showPage(i)); pageTabs.appendChild(b); });
+}
+function showPage(i, following) {        // following = the playhead moved here; don't stop the dance or touch the pose being edited
+  pg = Math.max(0, Math.min(pages.length - 1, i)); slots = pages[pg];
+  if (!following) { stopPlay(); if (slots[sel]) { P = { ...slots[sel] }; syncUI(); drawFace(P.face); } setStatus(`Eight-count ${pg + 1} of ${pages.length}.`); }
+  rebuildScore(); if (!following) paintSlots();
+}
+pageN.addEventListener("change", () => {
+  const n = Math.max(1, Math.min(MAX_PAGES, Math.round(+pageN.value) || 1)); stopPlay();
+  if (n < pages.length && pages.slice(n).some(q => q.some(Boolean))) { pageN.value = pages.length; setStatus(`Eight-count ${pages.findIndex((q, i) => i >= n && q.some(Boolean)) + 1} still has moves in it. Clear those counts first, then lower the number.`); return; }
+  while (pages.length < n) pages.push(new Array(SLOT_N).fill(null)); pages.length = n;
+  drawTabs(); showPage(Math.min(pg, n - 1)); persist(); setStatus(`${n} eight-count${n > 1 ? "s" : ""}: ${n * 8} beats before the dance starts over.`);
+});
+document.getElementById("pageCopy").addEventListener("click", () => {
+  if (pages.length >= MAX_PAGES) { setStatus(`${MAX_PAGES} eight-counts is the most a dance can hold.`); return; }
+  stopPlay(); pages.splice(pg + 1, 0, slots.map(s => s && { ...s })); drawTabs(); showPage(pg + 1); persist();
+  setStatus(`Eight-count ${pg + 1} is a copy of ${pg}. Change a few counts to vary it.`);
+});
 function setStatus(t) { document.getElementById("status").textContent = t; }
 document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${slotName(sel)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
-document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
-document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
+document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); pages = [slots]; pg = 0; drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
+document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; pages = [slots]; pg = 0; drawTabs(); sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
 
 // ---------- playback ----------
 let playing = false, t0 = 0, metro = true, groove = true, actx = null, lastTick = -1;
@@ -931,7 +974,7 @@ function showCoach(beats) {
   [...cstrip.children].forEach(sp => sp.classList.toggle("lit", !pre && +sp.dataset.f === cur[0]));
 }
 function startPlay() {
-  if (!slots.some(Boolean) && !lvl && !beatOn && !trackBuf) { setStatus("Save at least one pose first."); return; }
+  if (!anyPose() && !lvl && !beatOn && !trackBuf) { setStatus("Save at least one pose first."); return; }
   playing = true; lastTick = -1; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary");
   const lead = countIn && (beatOn || lvl || trackBuf) ? 4 : 0; stopTrack();                                  // count-in starts on 5 so the 1 lands after "8"
   t0 = performance.now() + lead * 60000 / bpm();
@@ -945,15 +988,16 @@ function tick(accent) { if (!actx) return; const o = actx.createOscillator(), g 
   g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(accent ? 0.25 : 0.12, actx.currentTime + 0.002);
   g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.06); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.07); }
 const ease = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
-function poseAt(pos) {               // pos in boxes (quarter-beats), wraps over the 32 boxes
-  const keys = slots.map((s, i) => s ? i : -1).filter(i => i >= 0);
-  if (keys.length === 1) return { pose: slots[keys[0]], face: slots[keys[0]].face };
-  const p = pos % SLOT_N; let a = keys[keys.length - 1], b = keys[0];
+function poseAt(pos) {               // pos in boxes (quarter-beats), wraps over every eight-count in the dance
+  const all = pages.length === 1 ? slots : pages.flat(), N = all.length;
+  const keys = all.map((s, i) => s ? i : -1).filter(i => i >= 0);
+  if (keys.length === 1) return { pose: all[keys[0]], face: all[keys[0]].face };
+  const p = pos % N; let a = keys[keys.length - 1], b = keys[0];
   for (let i = 0; i < keys.length; i++) { if (keys[i] <= p) a = keys[i]; }
   const ai = keys.indexOf(a); b = keys[(ai + 1) % keys.length];
-  let span = (b - a + SLOT_N) % SLOT_N || SLOT_N, into = (p - a + SLOT_N) % SLOT_N;
+  let span = (b - a + N) % N || N, into = (p - a + N) % N;
   const k = ease(Math.min(1, into / Math.min(span, 3.2)));   // snap into each pose, then hold (a move one box away arrives in one box)
-  const A = slots[a], B = slots[b], out = {};
+  const A = all[a], B = all[b], out = {};
   for (const key in DEF) out[key] = A[key] + (B[key] - A[key]) * k;
   out.handL = k > 0.5 ? B.handL : A.handL; out.handR = k > 0.5 ? B.handR : A.handR;
   return { pose: out, face: k > 0.5 ? B.face : A.face };
@@ -1112,12 +1156,12 @@ function frame(now) {
   if (playing) {
     const useAudio = actx && (metro || beatOn || lvl || trackBuf); if (useAudio) schedule();
     beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; const pos = Math.max(0, beats) * SPB;
-    if (slots.some(Boolean)) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
+    if (anyPose()) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
     // bounce follows the counting level: once a beat for "1 2 3 4", on every half beat otherwise
     const bf = lvl === 1 ? 2 : 4;
     if (groove && beats >= 0) bounce = 0.025 * (0.5 + 0.5 * Math.cos(bf * Math.PI * beats)) ** 2;
     const ti = Math.floor(beats); if (!useAudio && ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
-    paintSlots(beats < 0 ? -1 : Math.floor(pos) % SLOT_N); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && Math.floor(pos) % SPB ? " " + SUBS[Math.floor(pos) % SPB] : "");
+    paintSlots(beats < 0 ? -1 : Math.floor(pos) % (pages.length * SLOT_N)); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && Math.floor(pos) % SPB ? " " + SUBS[Math.floor(pos) % SPB] : "");
     showCoach(beats);
     rings.forEach((r, i) => { const ph = (((beats - i * 0.33) % 1) + 1) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
   } else {
@@ -1133,8 +1177,8 @@ function frame(now) {
 
 // ---------- dance card in/out ----------
 function card() {
-  const counts = slots.map((s, i) => s && { count: slotCode(i), ...Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) }).filter(Boolean);
-  return JSON.stringify({ rig: "sparky-dance-rig/1", bpm: bpm(), counts }, null, 1);
+  const counts = pages.flatMap((q, pi) => q.map((s, i) => s && { ...(pages.length > 1 ? { eight: pi + 1 } : {}), count: slotCode(i), ...Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === "number" ? +v.toFixed(3) : v])) }).filter(Boolean));
+  return JSON.stringify({ rig: "sparky-dance-rig/1", bpm: bpm(), ...(pages.length > 1 ? { eights: pages.length } : {}), counts }, null, 1);
 }
 document.getElementById("copyCard").addEventListener("click", () => {
   const txt = card(); const ta = document.getElementById("cardIn");
@@ -1142,9 +1186,10 @@ document.getElementById("copyCard").addEventListener("click", () => {
     .catch(() => { ta.value = txt; ta.select(); toast("Dance card is in the box below. Copy it from there."); });
 });
 document.getElementById("loadCard").addEventListener("click", () => {
-  try { const d = JSON.parse(document.getElementById("cardIn").value); const ns = new Array(SLOT_N).fill(null);
-    (d.counts || []).forEach(c => { const m = String(c.count).match(/^(\d+)([e&a]?)$/); if (!m) return; const i = (parseInt(m[1]) - 1) * SPB + SUBS.indexOf(m[2]); if (i >= 0 && i < SLOT_N) { const { count, ...rest } = c; ns[i] = { ...DEF, face: "smile", ...rest }; } });
-    slots = ns; unifyBody(); syncUI(); if (d.bpm) document.getElementById("bpm").value = d.bpm; persist(); paintSlots(); toast("Dance card loaded.");
+  try { const d = JSON.parse(document.getElementById("cardIn").value);
+    const np = Math.max(1, Math.min(MAX_PAGES, Math.max(+d.eights || 1, ...(d.counts || []).map(c => +c.eight || 1)))), nps = Array.from({ length: np }, () => new Array(SLOT_N).fill(null));
+    (d.counts || []).forEach(c => { const m = String(c.count).match(/^(\d+)([e&a]?)$/); if (!m) return; const i = (parseInt(m[1]) - 1) * SPB + SUBS.indexOf(m[2]); const e8 = Math.min(np, Math.max(1, +c.eight || 1)) - 1; if (i >= 0 && i < SLOT_N) { const { count, eight, ...rest } = c; nps[e8][i] = { ...DEF, face: "smile", ...rest }; } });
+    stopPlay(); pages = nps; pg = 0; slots = pages[0]; sel = 0; drawTabs(); unifyBody(); syncUI(); if (d.bpm) document.getElementById("bpm").value = d.bpm; persist(); paintSlots(); toast("Dance card loaded.");
   } catch (e) { toast("That doesn't look like a dance card. Copy one from the rig and try again."); }
 });
 let toastT; function toast(m) { const el = document.getElementById("toast"); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
@@ -1223,7 +1268,7 @@ new ResizeObserver(() => drawStaff()).observe(staff);
 
 // BVH: skeleton hierarchy + one row of channel values per frame (centimetres, ZXY degrees)
 function bvh() {
-  const fps = 30, beats = SLOT_N / SPB, frames = Math.round(beats * 60 / bpm() * fps);
+  const fps = 30, beats = pages.length * SLOT_N / SPB, frames = Math.round(beats * 60 / bpm() * fps);
   const off = (o) => `${(o.x * 100).toFixed(2)} ${(o.y * 100).toFixed(2)} ${(o.z * 100).toFixed(2)}`;
   const R3 = "CHANNELS 3 Zrotation Xrotation Yrotation";
   const chain = (ind, name, o, body) => `${ind}JOINT ${name}\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}\t${R3}\n${body}${ind}}\n`;
@@ -1271,19 +1316,19 @@ document.getElementById("copyBvh").addEventListener("click", () => {
 });
 
 const _paint = paintSlots;
-paintSlots = function (playIdx = -1) { _paint(playIdx); if (!staff.hidden) drawStaff(playIdx); };
+paintSlots = function (playIdx = -1) { _paint(playIdx); if (!staff.hidden) drawStaff(playIdx < 0 ? -1 : playIdx % SLOT_N); };
 const _persist = persist;
 persist = function () { _persist(); rebuildScore(); };
 
 try { plushOn = localStorage.getItem("sparky-look") === "bear"; } catch (e) {}
-refreshLook();
+refreshLook(); drawTabs();
 unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationFrame(frame);
 })();
 </script>
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v15";
+const APP_VERSION = "sparky-v16";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
