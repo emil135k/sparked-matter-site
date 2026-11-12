@@ -995,13 +995,18 @@ const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase = bodyGeo.attribut
 const pBody = new THREE.Mesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true })); plush.add(pBody);
 const pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
 const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
-{ const sk = pm(furMat, pHead); sk.scale.set(0.2, 0.185, 0.19);
+// the skull has its own mesh so a paw pressing on it can leave a dent
+const skullGeo = new THREE.SphereGeometry(1, 64, 44), skullBase = skullGeo.attributes.position.array.slice();
+const pSkull = new THREE.Mesh(skullGeo, furMat); pSkull.scale.set(0.2, 0.185, 0.19); pHead.add(pSkull);
+const press = { L: { d: 0, n: new THREE.Vector3(0, 1, 0) }, R: { d: 0, n: new THREE.Vector3(0, 1, 0) } };
+{
   for (const sx of [-1, 1]) { const e = pm(furMat, pHead); e.position.set(sx * 0.15, 0.15, -0.01); e.scale.setScalar(0.075);
     const ie = pm(creamMat, pHead); ie.position.set(sx * 0.15, 0.15, 0.04); ie.scale.set(0.045, 0.045, 0.03); }
   const mz = pm(creamMat, pHead); mz.position.set(0, -0.04, 0.13); mz.scale.set(0.1, 0.075, 0.075);
   const ns = pm(noseMat, pHead); ns.position.set(0, -0.008, 0.2); ns.scale.set(0.026, 0.019, 0.018); }
 const jig = { p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0, ready: false };
 const _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pf = new THREE.Vector3(), _pu = new THREE.Vector3(), ZAX = new THREE.Vector3(0, 0, 1);
+const _hc = new THREE.Vector3(), _hp = new THREE.Vector3();
 const _px = new THREE.Vector3(), _pz = new THREE.Vector3(), _pm = new THREE.Matrix4(), _pq2 = new THREE.Quaternion();
 function plushUpdate(now) {
   if (!plushOn) return;
@@ -1009,7 +1014,30 @@ function plushUpdate(now) {
   const pel = W3(root), ch = W3(chest); root.getWorldQuaternion(_pq); _pf.set(0, 0, 1).applyQuaternion(_pq);
   const span = _pu.subVectors(ch, pel).length(); _pu.normalize();
   // arms and legs: pillow tubes over the bones
-  for (const [a, k] of [[armL, "L"], [armR, "R"]]) setLimb(PL["arm" + k], W3(a.sh), W3(a.el), W3(a.wr), FOLD);
+  // Paws can't pass through the big head. The bones underneath may reach inside it, but the suit stops at the surface:
+  // the paw sinks in a little and dents the fur, and the rest of the way it is held outside, with the forearm following it.
+  const hc = pSkull.getWorldPosition(_hc), HEAD_R = 0.265, PAW_R = 0.095, SINK = 0.055; let dented = false;
+  for (const [a, k, h] of [[armL, "L", handL], [armR, "R", handR]]) {
+    const wr = W3(a.wr), pr = press[k];
+    _hp.set(0, -0.085, 0).applyQuaternion(h.g.quaternion).add(h.g.position);          // middle of the pad
+    const dist = _hp.distanceTo(hc), pen = HEAD_R + PAW_R - dist; let want = 0;
+    if (pen > 0) {
+      if (dist > 0.03) pr.n.subVectors(_hp, hc).normalize();                           // too close to the middle to tell a direction: keep the last one
+      const sink = Math.min(pen, SINK), out = pen - sink; want = sink / HEAD_R;
+      h.g.position.addScaledVector(pr.n, out); wr.addScaledVector(pr.n, out);
+    }
+    pr.d += (want - pr.d) * 0.4; if (pr.d < 0.002) pr.d = 0; if (pr.d) dented = true;
+    setLimb(PL["arm" + k], W3(a.sh), W3(a.el), wr, FOLD);
+  }
+  if (dented || pSkull.userData.dented) {
+    const sp = skullGeo.attributes.position.array, dirs = [];
+    for (const k of ["L", "R"]) if (press[k].d) { const v = pSkull.worldToLocal(hc.clone().addScaledVector(press[k].n, HEAD_R)).normalize(); dirs.push([v.x, v.y, v.z, press[k].d]); }
+    for (let i = 0; i < sp.length; i += 3) { const x = skullBase[i], y = skullBase[i + 1], z = skullBase[i + 2]; let f = 1;
+      for (const [dx, dy, dz, d] of dirs) { const ang = Math.acos(Math.max(-1, Math.min(1, x * dx + y * dy + z * dz)));
+        f += d * (-1.25 * Math.exp(-((ang / 0.42) ** 2)) + 0.22 * Math.exp(-(((ang - 0.75) / 0.3) ** 2))); }      // a dent, with the stuffing pushed up into a soft rim around it
+      sp[i] = x * f; sp[i + 1] = y * f; sp[i + 2] = z * f; }
+    skullGeo.attributes.position.needsUpdate = true; skullGeo.computeVertexNormals(); pSkull.userData.dented = dented;
+  }
   for (const k of ["L", "R"]) { const L = LEGS[k], f = pFoot[k], pad = pPad[k];
     const ankle = L.knee.clone().sub(L.foot).normalize().multiplyScalar(0.1).add(L.foot);              // stop the leg just above the ankle, inside the foot
     setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD);
