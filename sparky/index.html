@@ -1087,6 +1087,14 @@ const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase = bodyGeo.attribut
 const pBody = new THREE.Mesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true })); plush.add(pBody);
 const pTummy = pm(creamMat), pTail = pm(furMat), pFoot = { L: pm(furMat), R: pm(furMat) }, pPad = { L: pm(creamMat), R: pm(creamMat) };
 const pHead = new THREE.Group(); pHead.visible = false; headGroup.add(pHead);
+// the plushie's face: the same drawn face, but wrapped onto the head so eyes and cheeks sit on the fur and the mouth sits on the muzzle
+const faceWrap = (() => { const W = 0.447, g = new THREE.PlaneGeometry(W, W, 40, 40), q = g.attributes.position;
+  for (let i = 0; i < q.count; i++) { const x = q.getX(i), y = q.getY(i);
+    const s = 1 - (x / 0.28) ** 2 - (y / 0.259) ** 2, m = 1 - (x / 0.14) ** 2 - ((y + 0.056) / 0.105) ** 2;
+    let z = s > 0 ? 0.266 * Math.sqrt(s) : 0; if (m > 0) z = Math.max(z, 0.182 + 0.105 * Math.sqrt(m));
+    q.setZ(i, z + 0.007); }
+  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: faceTex, transparent: true, depthWrite: false }));
+  mesh.position.y = 0.04; mesh.visible = false; headGroup.add(mesh); return mesh; })();
 // the skull has its own mesh so a paw pressing on it can leave a dent
 const skullGeo = new THREE.SphereGeometry(1, 64, 44), skullBase = skullGeo.attributes.position.array.slice();
 const pSkull = new THREE.Mesh(skullGeo, furMat); pSkull.scale.set(0.2, 0.185, 0.19); pHead.add(pSkull);
@@ -1179,7 +1187,7 @@ function refreshLook() {
   for (const k in S) { S[k].core.visible = S[k].capA.visible = stick; S[k].glow.visible = glow; if (S[k].toeCap) S[k].toeCap.visible = stick; }
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
   plush.visible = pHead.visible = plushOn; jig.ready = false;
-  pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.position.set(0, plushOn ? 0.04 : 0, plushOn ? 0.3 : 0.121); facePlane.scale.setScalar(plushOn ? 2.03 : 1);
+  pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.visible = !plushOn; faceWrap.visible = plushOn;
   for (const h of [handL, handR]) { h.glow.visible = glow; h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; }); shapeHand(h); }
   const b = document.getElementById("lookBtn"); b.textContent = "Plushie suit: " + (plushOn ? "on" : "off"); b.classList.toggle("on", plushOn);
   drawFace(shownFace);
@@ -1363,7 +1371,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v18";
+const APP_VERSION = "sparky-v19";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
