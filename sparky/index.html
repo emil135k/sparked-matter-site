@@ -255,7 +255,7 @@ const GROUPS = [
   { name: "Body build (whole dance)", cls: "hips", ctl: [
     ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
   { name: "Plushie suit (whole dance)", cls: "hips", ctl: [
-    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1], ["pear", "Pear shape (mascot)", 0, 1, 0.05, 0], ["cone", "Cone legs and sneakers", 0, 1, 0.05, 0] ] },
+    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1], ["pear", "Pear shape (mascot)", 0, 1, 0.05, 0], ["cone", "Cone legs and sneakers", 0, 1, 0.05, 0], ["drop", "Body hangs low (stubby legs)", 0, 1, 0.05, 0] ] },
   { name: "Spine", cls: "hips", ctl: [
     ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
   { name: "Shoulders", cls: "sh", ctl: [
@@ -315,7 +315,8 @@ GROUPS.forEach(g => {
 const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, cone: 0, suit: false },
                          "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, cone: 0, suit: true },
                          "Mascot bear": { hw: 0.14, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, cone: 0, suit: true },
-                         "Mascot dancer": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 0.9, cone: 1, suit: true } };
+                         "Mascot dancer": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 0.9, cone: 1, suit: true },
+                         "Stubby mascot": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 1, cone: 1, drop: 1, suit: true } };
 function userBuilds() { try { return JSON.parse(localStorage.getItem("sparky-builds") || "{}") || {}; } catch (e) { return {}; } }
 function fillBuilds(pick) {
   const sel = document.getElementById("buildSel"), mine = userBuilds();
@@ -338,7 +339,7 @@ document.getElementById("buildDel").addEventListener("click", () => { const v = 
   if (!v || v[0] !== "u") { setStatus("Pick one of your saved characters to delete. The two built-in ones stay."); return; }
   const mine = userBuilds(); delete mine[v.slice(2)]; try { localStorage.setItem("sparky-builds", JSON.stringify(mine)); } catch (e) {} fillBuilds(""); setStatus("Deleted."); });
 fillBuilds("");
-const DIST = new Set(["cone", "pear", "jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+const DIST = new Set(["drop", "cone", "pear", "jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
 const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
@@ -348,7 +349,7 @@ faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.fa
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
 let liveT;
 // the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
-const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold", "pear", "cone"];
+const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold", "pear", "cone", "drop"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
 function sameBody(src) { pages.forEach(q => q.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); })); }
 let BUILD = null; try { BUILD = JSON.parse(localStorage.getItem("sparky-build") || "null"); } catch (e) {}
@@ -1074,14 +1075,14 @@ function plushLimb(r) {
   return { curve, tube, r, a: pm(furMat), b: pm(furMat) };
 }
 const _f1 = new THREE.Vector3(), _f2 = new THREE.Vector3(), _fin = new THREE.Vector3(), _fc = new THREE.Vector3();
-function setLimb(l, a, j, b, fold, r0, r1) {
+function setLimb(l, a, j, b, fold, r0, r1, ts) {
   l.curve.v0.copy(a); l.curve.v1.copy(j); l.curve.v2.copy(b);
   const ng = new THREE.TubeGeometry(l.curve, LIMB_SEG, l.r, LIMB_RAD, false), g = l.tube.geometry, pos = g.attributes.position.array;
   pos.set(ng.attributes.position.array); g.attributes.normal.array.set(ng.attributes.normal.array); ng.dispose();
   // a cone leg: suit fabric that starts wide under the body and narrows to the ankle of the person inside
   const taper = r0 !== undefined && (Math.abs(r0 - l.r) > 1e-3 || Math.abs(r1 - l.r) > 1e-3);
   if (taper) { const ring = LIMB_RAD + 1;
-    for (let i = 0; i <= LIMB_SEG; i++) { const f = (r0 + (r1 - r0) * (i / LIMB_SEG)) / l.r;
+    for (let i = 0; i <= LIMB_SEG; i++) { const u = i / LIMB_SEG, f = (r0 + (r1 - r0) * (ts ? Math.max(0, (u - ts) / (1 - ts)) : u)) / l.r;   // ts: stay wide down to where the body ends
       _fc.set(0, 0, 0); for (let k = 0; k < LIMB_RAD; k++) { const o = (i * ring + k) * 3; _fc.x += pos[o]; _fc.y += pos[o + 1]; _fc.z += pos[o + 2]; } _fc.multiplyScalar(1 / LIMB_RAD);
       for (let k = 0; k < ring; k++) { const o = (i * ring + k) * 3; pos[o] = _fc.x + (pos[o] - _fc.x) * f; pos[o + 1] = _fc.y + (pos[o + 1] - _fc.y) * f; pos[o + 2] = _fc.z + (pos[o + 2] - _fc.z) * f; } }
     g.computeVertexNormals(); }
@@ -1190,7 +1191,7 @@ function plushUpdate(now) {
   for (const k of ["L", "R"]) { const L = LEGS[k], f = pFoot[k], pad = pPad[k];
     const ankle = L.knee.clone().sub(L.foot).normalize().multiplyScalar(0.1).add(L.foot);              // stop the leg just above the ankle, inside the foot
     const CONE = P.cone ?? 0, shoe = CONE > 0.5, sh = pShoe[k];
-    setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD, 0.13 + 0.075 * CONE, 0.13 - 0.062 * CONE);
+    setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD, 0.13 + 0.075 * CONE, 0.13 - 0.062 * CONE, 0.36 * (P.drop ?? 0));
     const d = _pv.subVectors(L.toe, L.foot).normalize();
     f.visible = pad.visible = !shoe; sh.visible = shoe; if (shoe) { sh.position.copy(L.foot); sh.position.y += 0.012; sh.quaternion.setFromUnitVectors(ZAX, d); }
     f.position.copy(L.foot).addScaledVector(d, 0.085); f.position.y += 0.068; f.scale.set(0.158, 0.098, 0.22); f.quaternion.setFromUnitVectors(ZAX, d);
@@ -1203,8 +1204,10 @@ function plushUpdate(now) {
   const off = _pv.subVectors(jig.p, target); if (off.length() > 0.07) { off.setLength(0.07); jig.p.copy(target).add(off); }
   const o = off.clone().multiplyScalar(JIG), sq = Math.max(0.86, Math.min(1.16, 1 + o.y * 2.2)), wd = 1 / Math.sqrt(sq);
   _px.crossVectors(_pu, _pf).normalize(); _pz.crossVectors(_px, _pu).normalize(); _pm.makeBasis(_px, _pu, _pz); _pq.setFromRotationMatrix(_pm);
-  const CONE = P.cone ?? 0, half = span / 2 + 0.2 + 0.04 * CONE;                    // the mascot's body hangs a little lower, down to the inseam
-  pBody.position.copy(target).addScaledVector(_pu, -0.04 * CONE).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd * (1 + 0.14 * CONE), half * sq, 0.28 * wd * (1 + 0.12 * CONE));
+  // the mascot's body is a bell that hangs below the dancer's real hips. "Body hangs low" drops its rim to just above the knee,
+  // so the legs look short and stubby while the legs inside keep their full length and reach
+  const CONE = P.cone ?? 0, hang = 0.04 * CONE + 0.085 * (P.drop ?? 0) * (P.lLen ?? 1), half = span / 2 + 0.2 + hang;   // the rim drops by twice "hang", the shoulders stay put
+  pBody.position.copy(target).addScaledVector(_pu, -hang).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd * (1 + 0.14 * CONE), half * sq, 0.28 * wd * (1 + 0.12 * CONE));
   pTummy.position.copy(target).addScaledVector(_pu, -0.04).addScaledVector(_pz, 0.165).addScaledVector(o, 1.0); pTummy.visible = false;
   // waist fold: when the spine bends, the pillow creases on the side it bends toward and bunches into a roll above and below
   chest.getWorldQuaternion(_pq2); _f1.set(0, 1, 0).applyQuaternion(_pq2); root.getWorldQuaternion(_pq2); _f2.set(0, 1, 0).applyQuaternion(_pq2);
@@ -1226,7 +1229,7 @@ function plushUpdate(now) {
       bp[i] = x * f + sx * sw; bp[i + 2] = z * f + sz * sw; }
     bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals(); pBody.userData.folded = bAmt > 0.01 || sAmt > 0.004;
   }
-  pTail.position.copy(pel).addScaledVector(_pz, -0.27 - 0.1 * PEAR).addScaledVector(o, 0.8).addScaledVector(_sl, loose); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
+  pTail.position.copy(pel).addScaledVector(_pu, -1.2 * hang).addScaledVector(_pz, -0.27 - 0.1 * PEAR).addScaledVector(o, 0.8).addScaledVector(_sl, loose); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
 }
 // Stick hands are thin and knuckly. Plushie hands are paws: a round pad that continues the forearm, with three stubby digits and a thumb
 // that swell out of the pad and overlap each other, so they read as fingers but blend like a padded leather glove.
@@ -1432,7 +1435,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v22";
+const APP_VERSION = "sparky-v23";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
