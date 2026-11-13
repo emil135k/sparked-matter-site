@@ -198,6 +198,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="clearAll">New routine</button>
         <button id="sampleBtn" title="Bring back Sparky's built-in demo dance. This replaces the routine on screen.">Sparky's demo dance</button>
         <button id="sampleBtn2" title="A four eight-count dancehall routine made for Bam Bam (122 BPM). This replaces the routine on screen.">Sparky's demo dance 2</button>
+        <button id="sampleBtn3" title="Two eight-counts that show off the whole-body turn: he turns his back, shakes, and spins round to the front. Best with the Mascot bear character. This replaces the routine on screen.">Demo dance 3 (spins)</button>
         <button id="copyCard">Copy dance card</button>
       </div>
     </div>
@@ -249,11 +250,12 @@ const GROUPS = [
   { name: "Hips", cls: "hips", ctl: [
     ["hx", "Slide", -0.3, 0.3, 0.01, 0], ["hz", "Pop fwd/back", -0.2, 0.2, 0.01, 0],
     ["hy", "Knee dip", 0, 0.55, 0.01, 0.03], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
+    ["turn", "Turn whole body", -720, 720, 5, 0],
     ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.13] ] },
   { name: "Body build (whole dance)", cls: "hips", ctl: [
     ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
   { name: "Plushie suit (whole dance)", cls: "hips", ctl: [
-    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1] ] },
+    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1], ["pear", "Pear shape (mascot)", 0, 1, 0.05, 0] ] },
   { name: "Spine", cls: "hips", ctl: [
     ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
   { name: "Shoulders", cls: "sh", ctl: [
@@ -310,8 +312,9 @@ GROUPS.forEach(g => {
     <button id="buildSave" title="Save the current arm, leg and spine lengths, hip width, jiggle, folds and suit under this name">Save</button></div>
   <div class="small" style="margin-top:6px">A character is the body: arm, leg and spine length, hip width, jiggle, folds and whether the plushie suit is on. It stays put when you load a dance or music.</div>`;
   controls.prepend(fs); }
-const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, suit: false },
-                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, suit: true } };
+const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, suit: false },
+                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, suit: true },
+                         "Mascot bear": { hw: 0.14, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, suit: true } };
 function userBuilds() { try { return JSON.parse(localStorage.getItem("sparky-builds") || "{}") || {}; } catch (e) { return {}; } }
 function fillBuilds(pick) {
   const sel = document.getElementById("buildSel"), mine = userBuilds();
@@ -334,7 +337,7 @@ document.getElementById("buildDel").addEventListener("click", () => { const v = 
   if (!v || v[0] !== "u") { setStatus("Pick one of your saved characters to delete. The two built-in ones stay."); return; }
   const mine = userBuilds(); delete mine[v.slice(2)]; try { localStorage.setItem("sparky-builds", JSON.stringify(mine)); } catch (e) {} fillBuilds(""); setStatus("Deleted."); });
 fillBuilds("");
-const DIST = new Set(["jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+const DIST = new Set(["pear", "jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
 const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
@@ -344,7 +347,7 @@ faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.fa
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
 let liveT;
 // the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
-const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold"];
+const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold", "pear"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
 function sameBody(src) { pages.forEach(q => q.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); })); }
 let BUILD = null; try { BUILD = JSON.parse(localStorage.getItem("sparky-build") || "null"); } catch (e) {}
@@ -361,7 +364,7 @@ function liveSave() {
 
 // mirror a pose left <-> right: swap the L/R controls and flip the sideways ones
 const SWAP = [["aLr", "aRr"], ["aLs", "aRs"], ["aLb", "aRb"], ["aLf", "aRf"], ["aLw", "aRw"], ["gL", "gR"], ["aLt", "aRt"], ["handL", "handR"], ["shL", "shR"], ["fLy", "fRy"], ["kL", "kR"], ["lookL", "lookR"]];
-const FLIP = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx"];
+const FLIP = ["turn", "hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx"];
 function mirror(o) {
   const m = { ...o };
   SWAP.forEach(([a, b]) => { m[a] = o[b]; m[b] = o[a]; if (m[a] === undefined) delete m[a]; if (m[b] === undefined) delete m[b]; });
@@ -588,7 +591,8 @@ drawFace("smile");
 
 // FK skeleton (invisible joints)
 const J = n => { const o = new THREE.Object3D(); o.name = n; return o; };
-const root = J("root"); scene.add(root);
+const turnPivot = new THREE.Object3D(); scene.add(turnPivot);          // "Turn whole body" spins this; everything hangs off it
+const root = J("root"); turnPivot.add(root);
 const hipL = J(), hipR = J(); hipL.position.set(-0.13, 0, 0); hipR.position.set(0.13, 0, 0); root.add(hipL, hipR);
 const sp1 = J(), sp2 = J(), sp3 = J(), chest = J(); root.add(sp1); sp1.add(sp2); sp2.position.y = 0.17; sp2.add(sp3); sp3.position.y = 0.17; sp3.add(chest); chest.position.y = 0.16;
 // neck: three small joints so nods, tilts and slides bend it in a smooth curve
@@ -654,11 +658,12 @@ function setHand(h, open, turn, sign) {        // open: 0 = fist, 1 = fingers sp
 const W3 = o => o.getWorldPosition(new THREE.Vector3());
 
 // Sparky faces the audience, so his own left is the viewer's right: mirror every sideways control
-const SIDEWAYS = ["hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx", "fLx", "fRx"];
+const SIDEWAYS = ["turn", "hx", "hyaw", "hroll", "sb", "syaw", "sroll", "htn", "htl", "nkx", "fLx", "fRx"];
 function poseCore(p0, bounce, ox, oz) {
   const p = { ...p0 }; SIDEWAYS.forEach(k => p[k] = -(p0[k] || 0));
   const LL = p.lLen ?? 1, AL = p.aLen ?? 1, SL = p.sLen ?? 1;
-  root.position.set(p.hx + ox, 0.04 + (0.94 - p.hy) * LL - bounce, p.hz + oz);
+  const T = (p.turn || 0) * D2R, cT = Math.cos(T), sT = Math.sin(T); turnPivot.rotation.y = T;
+  root.position.set(p.hx + ox * cT - oz * sT, 0.04 + (0.94 - p.hy) * LL - bounce, p.hz + ox * sT + oz * cT);   // the balance nudge arrives in stage directions
   sp2.position.y = sp3.position.y = 0.17 * SL; chest.position.y = 0.16 * SL;
   for (const a of [armL, armR]) { a.el.position.y = -0.27 * AL; a.wr.position.y = -0.25 * AL; }
   hipL.position.x = p.hw; hipR.position.x = -p.hw;
@@ -684,7 +689,7 @@ function poseCore(p0, bounce, ox, oz) {
     a.el.rotation.set(-p["a" + k + "f"] * D2R, 0, s * p["a" + k + "b"] * D2R, "XZY");
     a.wr.rotation.set(0, 0, s * p["a" + k + "w"] * D2R);
   }
-  root.updateMatrixWorld(true);
+  turnPivot.updateMatrixWorld(true);
   const pel = W3(root), hl = W3(hipL), hr = W3(hipR), c1 = W3(sp2), c2 = W3(sp3), ch = W3(chest), nb = W3(neckBase), n2 = W3(nk2), nk = W3(neckTop), hd = W3(headC);
   setSeg(S.hips, hl, hr, 0.02); setSpine([pel, c1, c2, ch, nb, n2, nk]);
   const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
@@ -692,11 +697,11 @@ function poseCore(p0, bounce, ox, oz) {
   setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, p.gR, p.aRt, p.handR);
   headGroup.position.copy(hd); headC.getWorldQuaternion(headGroup.quaternion);
   // legs: two-bone IK, knees bend toward the pelvis' facing
-  const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6);
+  const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6 + T);
   // feet stand a little wider than the hips; "knee up" lifts the foot up and forward so the thigh comes level (passé)
   const st = p.hw + 0.04;
-  const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45 * LL, p.fz * 0.5).addScaledVector(fwd, p.kL * 0.40 * LL);
-  const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45 * LL, -p.fz * 0.5).addScaledVector(fwd, p.kR * 0.40 * LL);
+  const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45 * LL, p.fz * 0.5).applyAxisAngle(UP, T).addScaledVector(fwd, p.kL * 0.40 * LL);
+  const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45 * LL, -p.fz * 0.5).applyAxisAngle(UP, T).addScaledVector(fwd, p.kR * 0.40 * LL);
   leg(hl, footL, fwd, S.thL, S.shinL, S.ftL, 0.47 * LL);
   leg(hr, footR, fwd, S.thR, S.shinR, S.ftR, 0.47 * LL);
   // eyes on hand: aim the face at the hand (turn + look up/down, measured from the chest), blended by the slider
@@ -805,6 +810,19 @@ const SAMPLE2 = (() => {
     beats([O1, O2, O1, O2, K1, K2, K1, K2], [Oup, Oup, Oup, Oup, Kup, Kup, Kup, Kup]),
     beats([S1, N1, S2, N2, A1, A2, F, { ...F, face: "cool" }], [null, null, null, null, up, up]) ];
 })();
+// Demo dance 3: turn away, shake, spin back. Shows the whole-body turn and the loose seat of the mascot suit.
+const SAMPLE3 = (() => {
+  const L = PRESETS["Hip pop L"], R = PRESETS["Hip pop R"], q = (o, turn, extra) => P_({ ...o, turn, ...extra });
+  const wide = { aLr: 85, aRr: 85, aLb: 20, aRb: 20, gL: 1, gR: 1, hy: 0.1 }, tuck = { aLr: 30, aRr: 30, aLb: 130, aRb: 130, aLf: 60, aRf: 60, hy: 0.14 };
+  const shL = { ...L, hy: 0.16, sl: 14 }, shR = { ...R, hy: 0.16, sl: 14 };
+  const beats = (list, ands) => { const a = new Array(SLOT_N).fill(null); list.forEach((x, b) => { a[b * SPB] = x; const m = ands && ands[b]; if (m) a[b * SPB + 2] = m; }); return a; };
+  return [
+    beats([q(L, 0), q(R, 0), q(L, 0, { face: "laugh" }), q(R, 0, { face: "laugh" }), q(wide, 90, { face: "ooh" }), q(shL, 180), q(shL, 180), q(shL, 180)],
+          [null, null, null, null, null, q(shR, 180), q(shR, 180), q(shR, 180)]),
+    beats([q(shR, 180), q(shR, 180), q(wide, 270, { face: "wow" }), q(PRESETS["Jazz hands"], 360), q(tuck, 540, { face: "focus" }), q(PRESETS["Rock on"], 720),
+           q({ ...PRESETS["Knee pop"], face: "laugh" }, 720), q({ aLr: 36, aLb: -20, gL: 0, aRr: 170, aRb: 10, gR: 1, aRt: 90, hx: -0.12, hroll: 10, sb: 7, htl: 6, hy: 0.05, face: "cool" }, 720)],
+          [q(shL, 180), q(shL, 180)]) ];
+})();
 function loadSample2() { pages = SAMPLE2.map(q => q.map(s => s && { ...s })); pg = 0; slots = pages[0]; }
 function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); pages = [slots]; pg = 0; }
 try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && (saved.pages || saved.slots)) { const fix = arr => { let q = arr.map(s => s && { ...DEF, face: "smile", ...s }); return q.length !== SLOT_N ? grow16(q) : q; };
@@ -846,6 +864,7 @@ document.getElementById("pageCopy").addEventListener("click", () => {
 function setStatus(t) { document.getElementById("status").textContent = t; }
 document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${slotName(sel)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
+document.getElementById("sampleBtn3").addEventListener("click", () => { stopPlay(); pages = SAMPLE3.map(q => q.map(s => s && { ...s })); pg = 0; slots = pages[0]; const bp = document.getElementById("bpm"); bp.value = 112; drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Demo dance 3 is loaded: two eight-counts with a turn, a shake and a double spin. Press Play."); });
 document.getElementById("sampleBtn2").addEventListener("click", () => { stopPlay(); loadSample2(); const bp = document.getElementById("bpm"); bp.value = 122; bp.dispatchEvent(new Event("input")); bp.dispatchEvent(new Event("change")); drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance 2 is loaded: four eight-counts at 122 BPM. Press Play."); });
 document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); pages = [slots]; pg = 0; drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
 document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; pages = [slots]; pg = 0; drawTabs(); sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
@@ -1034,6 +1053,7 @@ function poseAt(pos) {               // pos in boxes (quarter-beats), wraps over
   const k = ease(Math.min(1, into / Math.min(span, 3.2)));   // snap into each pose, then hold (a move one box away arrives in one box)
   const A = all[a], B = all[b], out = {};
   for (const key in DEF) out[key] = A[key] + (B[key] - A[key]) * k;
+  { const d = (B.turn || 0) - (A.turn || 0); if (b <= a && d && d % 360 === 0) out.turn = B.turn; }   // a full spin that ends where the dance starts over does not unwind
   out.handL = k > 0.5 ? B.handL : A.handL; out.handR = k > 0.5 ? B.handR : A.handR;
   return { pose: out, face: k > 0.5 ? B.face : A.face };
 }
@@ -1077,10 +1097,19 @@ function setLimb(l, a, j, b, fold) {
   l.a.position.copy(a); l.a.scale.setScalar(l.r * 0.985); l.b.position.copy(b); l.b.scale.setScalar(l.r * 0.985);
 }
 const PL = { armL: plushLimb(0.095), armR: plushLimb(0.095), legL: plushLimb(0.13), legR: plushLimb(0.13) };
-const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase = bodyGeo.attributes.position.array.slice();
+const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase0 = bodyGeo.attributes.position.array.slice(), bodyBase = bodyBase0.slice();
+// pear shape: small shoulders, a wide low bottom half, a rounded seat at the back and a little belly in front, like a stadium mascot suit
+let pearNow = 0;
+function shapeBody(pear) { pearNow = pear;
+  for (let i = 0; i < bodyBase0.length; i += 3) { const x = bodyBase0[i], y = bodyBase0[i + 1], z = bodyBase0[i + 2], rxz = Math.hypot(x, z) || 1e-6;
+    const w = 1 - pear * 0.36 * y + pear * 0.1 * Math.exp(-(((y + 0.45) / 0.3) ** 2));
+    const seat = z < 0 ? pear * 0.34 * Math.exp(-(((y + 0.5) / 0.27) ** 2)) * (-z / rxz) : pear * 0.12 * Math.exp(-(((y + 0.3) / 0.35) ** 2)) * (z / rxz);
+    bodyBase[i] = x * w; bodyBase[i + 1] = y; bodyBase[i + 2] = z * (w + seat); }
+  bodyGeo.attributes.position.array.set(bodyBase); bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals(); }
+const seatSp = { p: new THREE.Vector3(), v: new THREE.Vector3() }, _st = new THREE.Vector3(), _sl = new THREE.Vector3();
 // the cream tummy is painted onto the body itself, so it creases and bunches with it
 { const col = new Float32Array(bodyBase.length), fur = new THREE.Color(0xc98a4b), cream = new THREE.Color(0xf3dfb8), c = new THREE.Color();
-  for (let i = 0; i < bodyBase.length; i += 3) { const x = bodyBase[i], y = bodyBase[i + 1], z = bodyBase[i + 2];
+  for (let i = 0; i < bodyBase0.length; i += 3) { const x = bodyBase0[i], y = bodyBase0[i + 1], z = bodyBase0[i + 2];
     const d = Math.hypot(x / 0.6, (y + 0.14) / 0.56), k = z > 0 ? Math.max(0, Math.min(1, (1 - d) / 0.05)) : 0;
     c.copy(fur).lerp(cream, k); col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; }
   bodyGeo.setAttribute("color", new THREE.BufferAttribute(col, 3)); }
@@ -1158,14 +1187,24 @@ function plushUpdate(now) {
   // waist fold: when the spine bends, the pillow creases on the side it bends toward and bunches into a roll above and below
   chest.getWorldQuaternion(_pq2); _f1.set(0, 1, 0).applyQuaternion(_pq2); root.getWorldQuaternion(_pq2); _f2.set(0, 1, 0).applyQuaternion(_pq2);
   const lean = _f1.sub(_f2), leanAmt = lean.length(), bAmt = FOLD * Math.min(1, Math.max(0, leanAmt - 0.08) / 0.6), bp = bodyGeo.attributes.position.array;
-  if (bAmt > 0.01 || pBody.userData.folded) {
+  // the seat of the suit is loose: it rides on its own softer spring behind the hips, so it swings late and past when the hips shake or he spins,
+  // and the slack fabric bunches into folds across the rear while it does
+  const PEAR = P.pear ?? 0; if (PEAR !== pearNow) shapeBody(PEAR);
+  _st.copy(pel).addScaledVector(_pz, -0.22); if (!seatSp.ready) { seatSp.p.copy(_st); seatSp.v.set(0, 0, 0); seatSp.ready = true; }
+  seatSp.v.addScaledVector(_sl.subVectors(_st, seatSp.p), 150 * dt).multiplyScalar(Math.max(0, 1 - 5.5 * dt)); seatSp.p.addScaledVector(seatSp.v, dt);
+  _sl.subVectors(seatSp.p, _st); if (_sl.length() > 0.13) { _sl.setLength(0.13); seatSp.p.copy(_st).add(_sl); }
+  const loose = JIG * (0.35 + 0.65 * PEAR), sx = _sl.dot(_px) * loose / 0.31, sz = _sl.dot(_pz) * loose / 0.28, sAmt = Math.hypot(sx, sz);
+  const wr = FOLD * (0.3 + 0.7 * PEAR) * Math.min(1, sAmt / 0.22) * 0.05;
+  if (bAmt > 0.01 || sAmt > 0.004 || pBody.userData.folded) {
     const lx = lean.dot(_px), lz = lean.dot(_pz), ll = Math.hypot(lx, lz) || 1, ux = lx / ll, uz = lz / ll;
     for (let i = 0; i < bp.length; i += 3) { const x = bodyBase[i], y = bodyBase[i + 1], z = bodyBase[i + 2], rxz = Math.hypot(x, z) || 1;
       const inner = Math.max(0, (x * ux + z * uz) / rxz), crease = Math.exp(-(((y + 0.1) / 0.1) ** 2)), rolls = Math.exp(-(((Math.abs(y + 0.1) - 0.24) / 0.13) ** 2));
-      const f = 1 + bAmt * inner * (-0.3 * crease + 0.14 * rolls); bp[i] = x * f; bp[i + 2] = z * f; }
-    bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals(); pBody.userData.folded = bAmt > 0.01;
+      const low = Math.min(1, Math.max(0, (-y - 0.05) / 0.6)), back = Math.max(0, -z / rxz), sw = low * low * (0.45 + 0.55 * back);
+      const f = 1 + bAmt * inner * (-0.3 * crease + 0.14 * rolls) + wr * low * back * Math.sin(y * 24);
+      bp[i] = x * f + sx * sw; bp[i + 2] = z * f + sz * sw; }
+    bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals(); pBody.userData.folded = bAmt > 0.01 || sAmt > 0.004;
   }
-  pTail.position.copy(pel).addScaledVector(_pz, -0.27).addScaledVector(o, 0.8); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
+  pTail.position.copy(pel).addScaledVector(_pz, -0.27 - 0.1 * PEAR).addScaledVector(o, 0.8).addScaledVector(_sl, loose); pTail.position.y += 0.02; pTail.scale.setScalar(0.06);
 }
 // Stick hands are thin and knuckly. Plushie hands are paws: a round pad that continues the forearm, with three stubby digits and a thumb
 // that swell out of the pad and overlap each other, so they read as fingers but blend like a padded leather glove.
@@ -1186,7 +1225,7 @@ function refreshLook() {
   const stick = !plushOn, glow = stick && !keyMode;
   for (const k in S) { S[k].core.visible = S[k].capA.visible = stick; S[k].glow.visible = glow; if (S[k].toeCap) S[k].toeCap.visible = stick; }
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
-  plush.visible = pHead.visible = plushOn; jig.ready = false;
+  plush.visible = pHead.visible = plushOn; jig.ready = false; seatSp.ready = false;
   pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.visible = !plushOn; faceWrap.visible = plushOn;
   for (const h of [handL, handR]) { h.glow.visible = glow; h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; }); shapeHand(h); }
   const b = document.getElementById("lookBtn"); b.textContent = "Plushie suit: " + (plushOn ? "on" : "off"); b.classList.toggle("on", plushOn);
@@ -1345,7 +1384,7 @@ function bvh() {
   for (let f = 0; f < frames; f++) {
     const b = f / fps * bpm() / 60, r = poseAt(b * SPB);
     applyPose(r.pose, groove ? 0.025 * (0.5 + 0.5 * Math.cos(4 * Math.PI * b)) ** 2 : 0);
-    const row = [off(root.position), rot(root.quaternion), rot(sp1.quaternion), rot(sp2.quaternion), rot(sp3.quaternion), rot(chest.quaternion), rot(neckBase.quaternion), rot(nk2.quaternion), rot(neckTop.quaternion), rot(ident)];
+    const row = [off(W3(root)), rot(root.getWorldQuaternion(new THREE.Quaternion())), rot(sp1.quaternion), rot(sp2.quaternion), rot(sp3.quaternion), rot(chest.quaternion), rot(neckBase.quaternion), rot(nk2.quaternion), rot(neckTop.quaternion), rot(ident)];
     for (const a of [armL, armR]) row.push(rot(a.sh.quaternion), rot(a.el.quaternion), rot(a.wr.quaternion));
     row.push(...legRot(LEGS.L), ...legRot(LEGS.R));
     txt += row.join(" ") + "\n";
@@ -1371,7 +1410,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v20";
+const APP_VERSION = "sparky-v21";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
