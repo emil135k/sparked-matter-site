@@ -255,7 +255,7 @@ const GROUPS = [
   { name: "Body build (whole dance)", cls: "hips", ctl: [
     ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
   { name: "Plushie suit (whole dance)", cls: "hips", ctl: [
-    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1], ["pear", "Pear shape (mascot)", 0, 1, 0.05, 0] ] },
+    ["jig", "Jiggle (0 = off)", 0, 2, 0.05, 1], ["fold", "Folds (0 = off)", 0, 1.5, 0.05, 1], ["pear", "Pear shape (mascot)", 0, 1, 0.05, 0], ["cone", "Cone legs and sneakers", 0, 1, 0.05, 0] ] },
   { name: "Spine", cls: "hips", ctl: [
     ["sb", "Arc side", -35, 35, 1, 0], ["sl", "Arc fwd/back", -30, 40, 1, 0] ] },
   { name: "Shoulders", cls: "sh", ctl: [
@@ -312,9 +312,10 @@ GROUPS.forEach(g => {
     <button id="buildSave" title="Save the current arm, leg and spine lengths, hip width, jiggle, folds and suit under this name">Save</button></div>
   <div class="small" style="margin-top:6px">A character is the body: arm, leg and spine length, hip width, jiggle, folds and whether the plushie suit is on. It stays put when you load a dance or music.</div>`;
   controls.prepend(fs); }
-const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, suit: false },
-                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, suit: true },
-                         "Mascot bear": { hw: 0.14, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, suit: true } };
+const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, cone: 0, suit: false },
+                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, cone: 0, suit: true },
+                         "Mascot bear": { hw: 0.14, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, cone: 0, suit: true },
+                         "Mascot dancer": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 0.9, cone: 1, suit: true } };
 function userBuilds() { try { return JSON.parse(localStorage.getItem("sparky-builds") || "{}") || {}; } catch (e) { return {}; } }
 function fillBuilds(pick) {
   const sel = document.getElementById("buildSel"), mine = userBuilds();
@@ -323,7 +324,7 @@ function fillBuilds(pick) {
   sel.value = pick || "";
 }
 function applyBuild(b) {
-  stopPlay(); Object.assign(P, bodyOf({ ...P, ...b })); sameBody(bodyOf(P)); saveBuild();
+  stopPlay(); Object.assign(P, bodyOf(b));          // anything a saved character does not mention goes back to its default sameBody(bodyOf(P)); saveBuild();
   if (typeof b.suit === "boolean" && b.suit !== plushOn) { plushOn = b.suit; try { localStorage.setItem("sparky-look", plushOn ? "bear" : "stick"); } catch (e) {} refreshLook(); }
   syncUI(); liveSave();
 }
@@ -337,7 +338,7 @@ document.getElementById("buildDel").addEventListener("click", () => { const v = 
   if (!v || v[0] !== "u") { setStatus("Pick one of your saved characters to delete. The two built-in ones stay."); return; }
   const mine = userBuilds(); delete mine[v.slice(2)]; try { localStorage.setItem("sparky-builds", JSON.stringify(mine)); } catch (e) {} fillBuilds(""); setStatus("Deleted."); });
 fillBuilds("");
-const DIST = new Set(["pear", "jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
+const DIST = new Set(["cone", "pear", "jig", "fold", "aLen", "lLen", "sLen", "gL", "gR", "lookL", "lookR", "hx", "hz", "hy", "sw", "nkx", "nkz", "hw", "kL", "kR", "bal", "shL", "shR", "fLx", "fRx", "fLy", "fRy", "fz"]);
 function showVal(k) { const v = P[k]; document.getElementById("o_" + k).textContent = DIST.has(k) ? v.toFixed(2) : Math.round(v) + "°"; }
 function syncUI() { for (const k in inputs) { inputs[k].value = P[k]; showVal(k); } faceSel.value = P.face; handSel.L.value = P.handL || ""; handSel.R.value = P.handR || ""; }
 const handSel = { L: document.getElementById("handL"), R: document.getElementById("handR") };
@@ -347,7 +348,7 @@ faceSel.addEventListener("change", () => { P.face = faceSel.value; drawFace(P.fa
 // whatever you change is written into the count you have selected, so Play always shows your latest edit
 let liveT;
 // the body's build (hip width, limb and spine lengths) belongs to the whole dance, not to one count
-const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold", "pear"];
+const BODY = ["hw", "aLen", "lLen", "sLen", "jig", "fold", "pear", "cone"];
 const bodyOf = o => Object.fromEntries(BODY.map(k => [k, o[k] ?? DEF[k]]));
 function sameBody(src) { pages.forEach(q => q.forEach(s => { if (s) BODY.forEach(k => s[k] = src[k]); })); }
 let BUILD = null; try { BUILD = JSON.parse(localStorage.getItem("sparky-build") || "null"); } catch (e) {}
@@ -1073,10 +1074,17 @@ function plushLimb(r) {
   return { curve, tube, r, a: pm(furMat), b: pm(furMat) };
 }
 const _f1 = new THREE.Vector3(), _f2 = new THREE.Vector3(), _fin = new THREE.Vector3(), _fc = new THREE.Vector3();
-function setLimb(l, a, j, b, fold) {
+function setLimb(l, a, j, b, fold, r0, r1) {
   l.curve.v0.copy(a); l.curve.v1.copy(j); l.curve.v2.copy(b);
   const ng = new THREE.TubeGeometry(l.curve, LIMB_SEG, l.r, LIMB_RAD, false), g = l.tube.geometry, pos = g.attributes.position.array;
   pos.set(ng.attributes.position.array); g.attributes.normal.array.set(ng.attributes.normal.array); ng.dispose();
+  // a cone leg: suit fabric that starts wide under the body and narrows to the ankle of the person inside
+  const taper = r0 !== undefined && (Math.abs(r0 - l.r) > 1e-3 || Math.abs(r1 - l.r) > 1e-3);
+  if (taper) { const ring = LIMB_RAD + 1;
+    for (let i = 0; i <= LIMB_SEG; i++) { const f = (r0 + (r1 - r0) * (i / LIMB_SEG)) / l.r;
+      _fc.set(0, 0, 0); for (let k = 0; k < LIMB_RAD; k++) { const o = (i * ring + k) * 3; _fc.x += pos[o]; _fc.y += pos[o + 1]; _fc.z += pos[o + 2]; } _fc.multiplyScalar(1 / LIMB_RAD);
+      for (let k = 0; k < ring; k++) { const o = (i * ring + k) * 3; pos[o] = _fc.x + (pos[o] - _fc.x) * f; pos[o + 1] = _fc.y + (pos[o + 1] - _fc.y) * f; pos[o + 2] = _fc.z + (pos[o + 2] - _fc.z) * f; } }
+    g.computeVertexNormals(); }
   // folds: where the limb bends, the stuffing creases on the inside of the joint and bunches into a roll on each side of the crease
   const bend = _f1.subVectors(j, a).angleTo(_f2.subVectors(b, j)), amt = fold * Math.min(1, Math.max(0, bend - 0.2) / 1.5);
   if (amt > 0.01) {
@@ -1087,15 +1095,27 @@ function setLimb(l, a, j, b, fold) {
       if (crease < 0.01 && rolls < 0.01) continue;
       _fc.set(0, 0, 0); for (let k = 0; k < LIMB_RAD; k++) { const o = (i * ring + k) * 3; _fc.x += pos[o]; _fc.y += pos[o + 1]; _fc.z += pos[o + 2]; } _fc.multiplyScalar(1 / LIMB_RAD);
       for (let k = 0; k < ring; k++) { const o = (i * ring + k) * 3, dx = pos[o] - _fc.x, dy = pos[o + 1] - _fc.y, dz = pos[o + 2] - _fc.z;
-        const inner = Math.max(0, (dx * _fin.x + dy * _fin.y + dz * _fin.z) / l.r), outer = 1 - inner;
+        const inner = Math.max(0, (dx * _fin.x + dy * _fin.y + dz * _fin.z) / (Math.hypot(dx, dy, dz) || l.r)), outer = 1 - inner;
         const f = 1 + amt * (-0.42 * crease * inner + 0.16 * rolls * inner + 0.06 * crease * outer);
         pos[o] = _fc.x + dx * f; pos[o + 1] = _fc.y + dy * f; pos[o + 2] = _fc.z + dz * f; }
     }
     g.computeVertexNormals();
   }
   g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true;
-  l.a.position.copy(a); l.a.scale.setScalar(l.r * 0.985); l.b.position.copy(b); l.b.scale.setScalar(l.r * 0.985);
+  l.a.position.copy(a); l.a.scale.setScalar((taper ? r0 : l.r) * 0.985); l.b.position.copy(b); l.b.scale.setScalar((taper ? r1 : l.r) * 0.985);
 }
+// sneakers for the mascot: ordinary shoe shape, a little oversized, in loud Sparked Matter colors, and the two shoes do not match
+function makeSneaker(up, cap, collar) { const g = new THREE.Group(); plush.add(g); const L = c => new THREE.MeshLambertMaterial({ color: c });
+  const part = (geo, mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); g.add(m); return m; };
+  const BOX = new THREE.BoxGeometry(1, 1, 1), CYLC = new THREE.CylinderGeometry(1, 1, 1, 20);
+  part(SPH, L(0xffffff), 0.072, 0.024, 0.175, 0, -0.008, 0.085);                    // sole
+  part(SPH, L(up), 0.064, 0.052, 0.155, 0, 0.034, 0.078);                           // upper
+  part(SPH, L(cap), 0.062, 0.04, 0.062, 0, 0.022, 0.19);                           // toe cap
+  part(CYLC, L(collar), 0.07, 0.075, 0.074, 0, 0.085, 0);                      // high-top collar the fur tucks into
+  part(SPH, L(0xffffff), 0.03, 0.03, 0.012, 0, 0.09, -0.075);                       // heel tab
+  const lace = L(0xf0c060); for (let i = 0; i < 4; i++) part(BOX, lace, 0.078, 0.009, 0.013, 0, 0.088 - i * 0.011, 0.075 + i * 0.03).rotation.x = 0.35;
+  g.scale.setScalar(1.3); g.visible = false; return g; }
+const pShoe = { L: makeSneaker(0xee7a6e, 0x5fd3c4, 0x58b4e6), R: makeSneaker(0x5fd3c4, 0xee7a6e, 0x9b6bd6) };
 const PL = { armL: plushLimb(0.095), armR: plushLimb(0.095), legL: plushLimb(0.13), legR: plushLimb(0.13) };
 const bodyGeo = new THREE.SphereGeometry(1, 96, 64), bodyBase0 = bodyGeo.attributes.position.array.slice(), bodyBase = bodyBase0.slice();
 // pear shape: small shoulders, a wide low bottom half, a rounded seat at the back and a little belly in front, like a stadium mascot suit
@@ -1169,8 +1189,10 @@ function plushUpdate(now) {
   }
   for (const k of ["L", "R"]) { const L = LEGS[k], f = pFoot[k], pad = pPad[k];
     const ankle = L.knee.clone().sub(L.foot).normalize().multiplyScalar(0.1).add(L.foot);              // stop the leg just above the ankle, inside the foot
-    setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD);
+    const CONE = P.cone ?? 0, shoe = CONE > 0.5, sh = pShoe[k];
+    setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD, 0.13 + 0.075 * CONE, 0.13 - 0.062 * CONE);
     const d = _pv.subVectors(L.toe, L.foot).normalize();
+    f.visible = pad.visible = !shoe; sh.visible = shoe; if (shoe) { sh.position.copy(L.foot); sh.position.y += 0.012; sh.quaternion.setFromUnitVectors(ZAX, d); }
     f.position.copy(L.foot).addScaledVector(d, 0.085); f.position.y += 0.068; f.scale.set(0.158, 0.098, 0.22); f.quaternion.setFromUnitVectors(ZAX, d);
     pad.position.copy(L.foot).addScaledVector(d, 0.245); pad.position.y += 0.05; pad.scale.set(0.105, 0.07, 0.075); pad.quaternion.copy(f.quaternion); }
   // one pillow for the whole body, from under the hips to over the shoulders, leaning with the spine.
@@ -1181,8 +1203,8 @@ function plushUpdate(now) {
   const off = _pv.subVectors(jig.p, target); if (off.length() > 0.07) { off.setLength(0.07); jig.p.copy(target).add(off); }
   const o = off.clone().multiplyScalar(JIG), sq = Math.max(0.86, Math.min(1.16, 1 + o.y * 2.2)), wd = 1 / Math.sqrt(sq);
   _px.crossVectors(_pu, _pf).normalize(); _pz.crossVectors(_px, _pu).normalize(); _pm.makeBasis(_px, _pu, _pz); _pq.setFromRotationMatrix(_pm);
-  const half = span / 2 + 0.2;
-  pBody.position.copy(target).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd, half * sq, 0.28 * wd);
+  const CONE = P.cone ?? 0, half = span / 2 + 0.2 + 0.04 * CONE;                    // the mascot's body hangs a little lower, down to the inseam
+  pBody.position.copy(target).addScaledVector(_pu, -0.04 * CONE).addScaledVector(o, 0.5); pBody.quaternion.copy(_pq); pBody.scale.set(0.31 * wd * (1 + 0.14 * CONE), half * sq, 0.28 * wd * (1 + 0.12 * CONE));
   pTummy.position.copy(target).addScaledVector(_pu, -0.04).addScaledVector(_pz, 0.165).addScaledVector(o, 1.0); pTummy.visible = false;
   // waist fold: when the spine bends, the pillow creases on the side it bends toward and bunches into a roll above and below
   chest.getWorldQuaternion(_pq2); _f1.set(0, 1, 0).applyQuaternion(_pq2); root.getWorldQuaternion(_pq2); _f2.set(0, 1, 0).applyQuaternion(_pq2);
@@ -1193,7 +1215,7 @@ function plushUpdate(now) {
   _st.copy(pel).addScaledVector(_pz, -0.22); if (!seatSp.ready) { seatSp.p.copy(_st); seatSp.v.set(0, 0, 0); seatSp.ready = true; }
   seatSp.v.addScaledVector(_sl.subVectors(_st, seatSp.p), 150 * dt).multiplyScalar(Math.max(0, 1 - 5.5 * dt)); seatSp.p.addScaledVector(seatSp.v, dt);
   _sl.subVectors(seatSp.p, _st); if (_sl.length() > 0.13) { _sl.setLength(0.13); seatSp.p.copy(_st).add(_sl); }
-  const loose = JIG * (0.35 + 0.65 * PEAR), sx = _sl.dot(_px) * loose / 0.31, sz = _sl.dot(_pz) * loose / 0.28, sAmt = Math.hypot(sx, sz);
+  const loose = JIG * (0.35 + 0.65 * Math.max(PEAR, CONE)), sx = _sl.dot(_px) * loose / 0.31, sz = _sl.dot(_pz) * loose / 0.28, sAmt = Math.hypot(sx, sz);
   const wr = FOLD * (0.3 + 0.7 * PEAR) * Math.min(1, sAmt / 0.22) * 0.05;
   if (bAmt > 0.01 || sAmt > 0.004 || pBody.userData.folded) {
     const lx = lean.dot(_px), lz = lean.dot(_pz), ll = Math.hypot(lx, lz) || 1, ux = lx / ll, uz = lz / ll;
@@ -1410,7 +1432,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v21";
+const APP_VERSION = "sparky-v22";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
