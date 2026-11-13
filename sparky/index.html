@@ -197,6 +197,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="clearPose">Clear count</button>
         <button id="clearAll">New routine</button>
         <button id="sampleBtn" title="Bring back Sparky's built-in demo dance. This replaces the routine on screen.">Sparky's demo dance</button>
+        <button id="sampleBtn2" title="A four eight-count dancehall routine made for Bam Bam (122 BPM). This replaces the routine on screen.">Sparky's demo dance 2</button>
         <button id="copyCard">Copy dance card</button>
       </div>
     </div>
@@ -781,6 +782,30 @@ const SAMPLE = [
   [0, P_(PRESETS["Hip pop L"])], [2, P_(PRESETS["Hip pop R"])], [4, P_({ ...PRESETS["Hip pop L"], face: "laugh" })], [6, P_({ ...PRESETS["Hip pop R"], face: "laugh" })],
   [8, P_(PRESETS["Body roll"])], [10, P_({ ...PRESETS["Body roll"], sl: -16, hz: 0.06, hnd: 8 })], [12, P_(PRESETS["Shimmy"])], [13, P_({ ...PRESETS["Shimmy"], syaw: -25, shL: 0, shR: 0.06 })],
   [14, P_(PRESETS["Jazz hands"])], [15, P_(PRESETS["Heart"])] ];
+// Demo dance 2: a dancehall routine in four eight-counts (groove, wide arms with knee swivel, overhead wave and kicks, sweep and finish), 122 BPM
+const SAMPLE2 = (() => {
+  const G = { aLr: 15, aRr: 15, aLs: 20, aRs: 20, aLb: 100, aRb: 100, aLf: 85, aRf: 85, gL: 0.3, gR: 0.3 };   // his left is -x: a left foot steps out with a negative number
+  const up = P_({ ...G, hy: 0.03 });
+  const A1 = P_({ ...G, hx: 0.09, hroll: -7, hy: 0.13, fLy: 0.09, kL: 0.15, aLf: 110, aRf: 60, aLb: 80, aRb: 115, sb: 4, syaw: 10 }), A2 = P_(mirror(A1));
+  const W = { aLr: 85, aRr: 85, aLb: 35, aRb: 35, aLw: 30, aRw: 30, gL: 1, gR: 1, aLt: 60, aRt: 60 };
+  const W1 = P_({ ...W, hy: 0.16, hyaw: 24, syaw: -10, hx: 0.08, fRx: 0.07, fLy: 0.05, face: "smug" }), W2 = P_(mirror(W1));
+  const Wup = P_({ ...W, hy: 0.04 });
+  const R1 = P_({ ...W1, aLr: 125, aRr: 125, face: "ooh" }), R2 = P_({ ...W2, aLr: 150, aRr: 150, face: "ooh" });
+  const O1 = P_({ aLr: 160, aRr: 160, aLb: 35, aRb: 35, gL: 1, gR: 1, aLt: 90, aRt: 90, sb: 12, hx: -0.14, hroll: 10, hy: 0.12, htl: 8, face: "laugh" }), O2 = P_(mirror(O1));
+  const Oup = P_({ aLr: 165, aRr: 165, aLb: 25, aRb: 25, gL: 1, gR: 1, aLt: 90, aRt: 90, hy: 0.04, face: "laugh" });
+  const K1 = P_({ aRr: 165, aRb: 15, aLr: 85, aLb: 25, gL: 1, gR: 1, hy: 0.2, fLx: -0.12, fRx: 0.18, fRy: 0.1, hx: -0.07, sb: 5, face: "wow" }), K2 = P_(mirror(K1));
+  const Kup = P_({ aRr: 120, aLr: 120, aLb: 40, aRb: 40, gL: 1, gR: 1, hy: 0.06, fLx: -0.08, fRx: 0.08, face: "wow" });
+  const S1 = P_({ aLr: 45, aRr: 45, aLb: 10, aRb: 10, gL: 1, gR: 1, fLx: -0.25, fLy: 0.04, hx: 0.1, hy: 0.15, sb: 6, hnd: 6, face: "smug" }), S2 = P_(mirror(S1));
+  const N1 = P_({ aRr: 165, aRb: 15, aLr: 80, aLb: 30, gL: 1, gR: 1, kL: 0.6, bal: 1, hy: 0.05, face: "laugh" }), N2 = P_(mirror(N1));
+  const F = P_({ aLr: 36, aLb: -20, gL: 0, aRr: 170, aRb: 10, gR: 1, aRt: 90, hx: -0.12, hroll: 10, sb: 7, htl: 6, hy: 0.05, face: "wink" });
+  const beats = (list, ands) => { const a = new Array(SLOT_N).fill(null); list.forEach((q, b) => { a[b * SPB] = q; const m = ands && ands[b]; if (m) a[b * SPB + 2] = m; }); return a; };
+  return [
+    beats([A1, A2, A1, A2, { ...A1, face: "laugh" }, { ...A2, face: "laugh" }, { ...A1, face: "laugh" }, { ...A2, face: "laugh" }], [up, up, up, up, up, up, up, up]),
+    beats([W1, W2, W1, W2, R1, R2, { ...R1, aLr: 165, aRr: 165 }, { ...R2, aLr: 170, aRr: 170 }], [Wup, Wup, Wup, Wup]),
+    beats([O1, O2, O1, O2, K1, K2, K1, K2], [Oup, Oup, Oup, Oup, Kup, Kup, Kup, Kup]),
+    beats([S1, N1, S2, N2, A1, A2, F, { ...F, face: "cool" }], [null, null, null, null, up, up]) ];
+})();
+function loadSample2() { pages = SAMPLE2.map(q => q.map(s => s && { ...s })); pg = 0; slots = pages[0]; }
 function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); pages = [slots]; pg = 0; }
 try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && (saved.pages || saved.slots)) { const fix = arr => { let q = arr.map(s => s && { ...DEF, face: "smile", ...s }); return q.length !== SLOT_N ? grow16(q) : q; };
   pages = (saved.pages && saved.pages.length ? saved.pages : [saved.slots]).slice(0, MAX_PAGES).map(fix); pg = 0; slots = pages[0]; document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
@@ -821,6 +846,7 @@ document.getElementById("pageCopy").addEventListener("click", () => {
 function setStatus(t) { document.getElementById("status").textContent = t; }
 document.getElementById("savePose").addEventListener("click", () => { slots[sel] = { ...P }; persist(); paintSlots(); setStatus(`Saved on ${slotName(sel)}.`); });
 document.getElementById("clearPose").addEventListener("click", () => { slots[sel] = null; persist(); paintSlots(); setStatus("Count cleared."); });
+document.getElementById("sampleBtn2").addEventListener("click", () => { stopPlay(); loadSample2(); const bp = document.getElementById("bpm"); bp.value = 122; bp.dispatchEvent(new Event("input")); bp.dispatchEvent(new Event("change")); drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance 2 is loaded: four eight-counts at 122 BPM. Press Play."); });
 document.getElementById("sampleBtn").addEventListener("click", () => { stopPlay(); loadSample(); slots = slots.map(s => s && { ...DEF, face: "smile", ...s }); pages = [slots]; pg = 0; drawTabs(); sel = 0; unifyBody(); syncUI(); persist(); paintSlots(); setStatus("Sparky's demo dance is loaded. Press Play."); });
 document.getElementById("clearAll").addEventListener("click", () => { stopPlay(); slots = new Array(SLOT_N).fill(null); slots[0] = { ...DEF, face: "smile", ...bodyOf(P) }; pages = [slots]; pg = 0; drawTabs(); sel = 0; persist(); paintSlots(); setStatus("New routine: pose the dancer, then save to a count."); });
 
@@ -1337,7 +1363,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v17";
+const APP_VERSION = "sparky-v18";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
