@@ -579,7 +579,7 @@ function drawFace(ex) {
   else if (ex === "dizzy") { g.moveTo(92, 176); g.bezierCurveTo(104, 158, 116, 194, 128, 176); g.bezierCurveTo(140, 158, 152, 194, 164, 176); g.stroke(); }
   else if (ex === "focus") { g.moveTo(100, 160); g.lineTo(156, 160); g.stroke(); g.fillStyle = C; g.beginPath(); g.arc(140, 168, 12, 0, Math.PI); g.fill(); }
   else { g.arc(128, 136, 38, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); }
-  g.fillStyle = "rgba(238,122,110,.55)"; [[62, 150], [194, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill(); });
+  if (!plushOn) { g.fillStyle = "rgba(238,122,110,.55)"; [[62, 150], [194, 150]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill(); }); }   // the bear has no cheek dots
   faceTex.needsUpdate = true;
 }
 function heart(g, x, y, s) { g.beginPath(); g.moveTo(x, y + s * 0.9); g.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.6, y - s * 1.1, x, y - s * 0.35);
@@ -1371,7 +1371,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v19";
+const APP_VERSION = "sparky-v20";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
