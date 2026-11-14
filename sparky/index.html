@@ -245,13 +245,18 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
 <script>
 (() => {
 const D2R = Math.PI / 180;
+// Body measurements at every slider's 1.0: a well-built six-foot man, 1 unit = 1 metre. The Blender suit is built from this same table.
+const HUMAN = { hip: 0.09, shoulder: 0.22, upperArm: 0.34, forearm: 0.27, spine1: 0.145, spine2: 0.145, chest: 0.14, thigh: 0.47, shin: 0.47, hand: 0.198, heel: 0.07, toes: 0.21 };
+// one-time move from the old, wider-hipped figure: saved characters and dances that still carry the old hip width get the new one
+try { if (localStorage.getItem("sparky-human") !== "1") { for (const k of ["sparky-build", "sparky-builds", "sparky-routine"]) { const v = localStorage.getItem(k);
+  if (v) localStorage.setItem(k, v.replace(/"hw":0\.13(?![0-9])/g, '"hw":0.09').replace(/"hw":0\.14(?![0-9])/g, '"hw":0.1')); } localStorage.setItem("sparky-human", "1"); } } catch (e) {}
 // ---------- controls ----------
 const GROUPS = [
   { name: "Hips", cls: "hips", ctl: [
     ["hx", "Slide", -0.3, 0.3, 0.01, 0], ["hz", "Pop fwd/back", -0.2, 0.2, 0.01, 0],
     ["hy", "Knee dip", 0, 0.55, 0.01, 0.03], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
     ["turn", "Turn whole body", -720, 720, 5, 0],
-    ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.13] ] },
+    ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.09] ] },
   { name: "Body build (whole dance)", cls: "hips", ctl: [
     ["aLen", "Arm length", 0.4, 1.2, 0.05, 1], ["lLen", "Leg length", 0.3, 1.2, 0.05, 1], ["sLen", "Spine length", 0.5, 1.3, 0.05, 1] ] },
   { name: "Plushie suit (whole dance)", cls: "hips", ctl: [
@@ -312,11 +317,11 @@ GROUPS.forEach(g => {
     <button id="buildSave" title="Save the current arm, leg and spine lengths, hip width, jiggle, folds and suit under this name">Save</button></div>
   <div class="small" style="margin-top:6px">A character is the body: arm, leg and spine length, hip width, jiggle, folds and whether the plushie suit is on. It stays put when you load a dance or music.</div>`;
   controls.prepend(fs); }
-const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, cone: 0, suit: false },
-                         "Teddy bear": { hw: 0.13, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, cone: 0, suit: true },
-                         "Mascot bear": { hw: 0.14, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, cone: 0, suit: true },
-                         "Mascot dancer": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 0.9, cone: 1, suit: true },
-                         "Stubby mascot": { hw: 0.13, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 1, cone: 1, drop: 1, suit: true } };
+const BUILTIN_BUILDS = { "Stick figure (original)": { hw: 0.09, aLen: 1, lLen: 1, sLen: 1, jig: 1, fold: 1, pear: 0, cone: 0, suit: false },
+                         "Teddy bear": { hw: 0.09, aLen: 0.65, lLen: 0.45, sLen: 0.85, jig: 1, fold: 1, pear: 0, cone: 0, suit: true },
+                         "Mascot bear": { hw: 0.1, aLen: 0.7, lLen: 0.5, sLen: 0.85, jig: 1.3, fold: 1.2, pear: 0.8, cone: 0, suit: true },
+                         "Mascot dancer": { hw: 0.09, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 0.9, cone: 1, suit: true },
+                         "Stubby mascot": { hw: 0.09, aLen: 1, lLen: 1, sLen: 1, jig: 1.3, fold: 1.2, pear: 1, cone: 1, drop: 1, suit: true } };
 function userBuilds() { try { return JSON.parse(localStorage.getItem("sparky-builds") || "{}") || {}; } catch (e) { return {}; } }
 function fillBuilds(pick) {
   const sel = document.getElementById("buildSel"), mine = userBuilds();
@@ -595,8 +600,8 @@ drawFace("smile");
 const J = n => { const o = new THREE.Object3D(); o.name = n; return o; };
 const turnPivot = new THREE.Object3D(); scene.add(turnPivot);          // "Turn whole body" spins this; everything hangs off it
 const root = J("root"); turnPivot.add(root);
-const hipL = J(), hipR = J(); hipL.position.set(-0.13, 0, 0); hipR.position.set(0.13, 0, 0); root.add(hipL, hipR);
-const sp1 = J(), sp2 = J(), sp3 = J(), chest = J(); root.add(sp1); sp1.add(sp2); sp2.position.y = 0.17; sp2.add(sp3); sp3.position.y = 0.17; sp3.add(chest); chest.position.y = 0.16;
+const hipL = J(), hipR = J(); hipL.position.set(-HUMAN.hip, 0, 0); hipR.position.set(HUMAN.hip, 0, 0); root.add(hipL, hipR);
+const sp1 = J(), sp2 = J(), sp3 = J(), chest = J(); root.add(sp1); sp1.add(sp2); sp2.position.y = HUMAN.spine1; sp2.add(sp3); sp3.position.y = HUMAN.spine2; sp3.add(chest); chest.position.y = HUMAN.chest;
 // neck: three small joints so nods, tilts and slides bend it in a smooth curve
 const neckBase = J(); chest.add(neckBase); neckBase.position.y = 0.10;
 const nk2 = J(); neckBase.add(nk2); nk2.position.y = 0.045;
@@ -611,14 +616,14 @@ function arcStep(fwdDeg, sideDeg, n, out) {
   _ax.set(fwdDeg, 0, sideDeg).normalize(); return out.setFromAxisAngle(_ax, a / n);
 }
 function makeArm(side) {
-  const sh = J(); chest.add(sh); const el = J(); sh.add(el); el.position.y = -0.27; const wr = J(); el.add(wr); wr.position.y = -0.25;
+  const sh = J(); chest.add(sh); const el = J(); sh.add(el); el.position.y = -HUMAN.upperArm; const wr = J(); el.add(wr); wr.position.y = -HUMAN.forearm;
   const hand = J(); wr.add(hand); hand.position.y = -0.09; return { sh, el, wr, hand, side };
 }
 const armL = makeArm(1), armR = makeArm(-1);
 // hands: a palm, three chunky fingers and a thumb, cartoon-sized so they read from across the room.
 // Built in the wrist's own space (fingers point down the arm), then placed on the wrist every pose.
 function makeHand(arm) {
-  const g = new THREE.Group(); scene.add(g); g.scale.setScalar(1.55);
+  const g = new THREE.Group(); scene.add(g); g.scale.setScalar(HUMAN.hand / 0.138);        // wrist to fingertip comes out at a real hand's length
   const mat = new THREE.MeshBasicMaterial({ color: COL.gold });
   const palm = new THREE.Mesh(SPH, mat); palm.scale.set(0.02, 0.043, 0.042); palm.position.y = -0.04; g.add(palm);
   const glow = new THREE.Mesh(SPH, glowMat(COL.gold, 0.16)); glow.scale.set(0.05, 0.085, 0.07); glow.position.y = -0.055; g.add(glow);
@@ -666,8 +671,8 @@ function poseCore(p0, bounce, ox, oz) {
   const LL = p.lLen ?? 1, AL = p.aLen ?? 1, SL = p.sLen ?? 1;
   const T = (p.turn || 0) * D2R, cT = Math.cos(T), sT = Math.sin(T); turnPivot.rotation.y = T;
   root.position.set(p.hx + ox * cT - oz * sT, 0.04 + (0.94 - p.hy) * LL - bounce, p.hz + ox * sT + oz * cT);   // the balance nudge arrives in stage directions
-  sp2.position.y = sp3.position.y = 0.17 * SL; chest.position.y = 0.16 * SL;
-  for (const a of [armL, armR]) { a.el.position.y = -0.27 * AL; a.wr.position.y = -0.25 * AL; }
+  sp2.position.y = HUMAN.spine1 * SL; sp3.position.y = HUMAN.spine2 * SL; chest.position.y = HUMAN.chest * SL;
+  for (const a of [armL, armR]) { a.el.position.y = -HUMAN.upperArm * AL; a.wr.position.y = -HUMAN.forearm * AL; }
   hipL.position.x = p.hw; hipR.position.x = -p.hw;
   root.rotation.set(0, p.hyaw * D2R, p.hroll * D2R, "YXZ");
   // spine: a single arc from hips to shoulders; it starts upright even when the hips tilt, so there is no S or kink
@@ -675,7 +680,7 @@ function poseCore(p0, bounce, ox, oz) {
   sp1.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -p.hroll * D2R).multiply(_qa);
   sp2.quaternion.copy(_qa); sp3.quaternion.copy(_qa);
   chest.rotation.set(0, (p.syaw - p.hyaw * 0.5) * D2R, p.sroll * D2R, "YXZ");
-  armL.sh.position.set(armL.side * 0.21, 0.1 + p.shL, 0); armR.sh.position.set(armR.side * 0.21, 0.1 + p.shR, 0);
+  armL.sh.position.set(armL.side * HUMAN.shoulder, 0.1 + p.shL, 0); armR.sh.position.set(armR.side * HUMAN.shoulder, 0.1 + p.shR, 0);
   // head slide / peck: bend the neck base one way and the top back the other, so the head stays level
   const as = v => Math.asin(Math.max(-0.95, Math.min(0.95, (v || 0) / NECK_REACH)));
   // neck: nod and tilt are one small arc over the three neck joints; slide/peck add an S so the head stays level
@@ -701,11 +706,11 @@ function poseCore(p0, bounce, ox, oz) {
   // legs: two-bone IK, knees bend toward the pelvis' facing
   const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, p.hyaw * D2R * 0.6 + T);
   // feet stand a little wider than the hips; "knee up" lifts the foot up and forward so the thigh comes level (passé)
-  const st = p.hw + 0.04;
+  const st = p.hw;                       // relaxed stance: feet straight under the hips, three to four inches between them
   const footL = new THREE.Vector3(st + p.fLx, 0.03 + p.fLy + p.kL * 0.45 * LL, p.fz * 0.5).applyAxisAngle(UP, T).addScaledVector(fwd, p.kL * 0.40 * LL);
   const footR = new THREE.Vector3(-st + p.fRx, 0.03 + p.fRy + p.kR * 0.45 * LL, -p.fz * 0.5).applyAxisAngle(UP, T).addScaledVector(fwd, p.kR * 0.40 * LL);
-  leg(hl, footL, fwd, S.thL, S.shinL, S.ftL, 0.47 * LL);
-  leg(hr, footR, fwd, S.thR, S.shinR, S.ftR, 0.47 * LL);
+  leg(hl, footL, fwd, S.thL, S.shinL, S.ftL, HUMAN.thigh * LL);
+  leg(hr, footR, fwd, S.thR, S.shinR, S.ftR, HUMAN.thigh * LL);
   // eyes on hand: aim the face at the hand (turn + look up/down, measured from the chest), blended by the slider
   const wl = p0.lookL || 0, wr = p0.lookR || 0;
   if (!p0._aim && (wl > 0 || wr > 0)) {
@@ -765,7 +770,7 @@ function leg(h, f, fwd, sTh, sSh, sFt, L) {
   const knee = mid.addScaledVector(perp, ht);
   const toe = foot.clone().add(fwd.clone().multiplyScalar(0.11));
   setSeg(sTh, h, knee, 0.021); setSeg(sSh, knee, foot, 0.02);
-  const heel = foot.clone().addScaledVector(fwd, -0.045), tip = foot.clone().addScaledVector(fwd, 0.16);
+  const heel = foot.clone().addScaledVector(fwd, -HUMAN.heel), tip = foot.clone().addScaledVector(fwd, HUMAN.toes);   // an 11 inch foot, about a size 12
   heel.y += 0.006; tip.y += 0.006;
   setSeg(sFt, heel, tip, 0.034);
   if (!sFt.toeCap) { sFt.toeCap = new THREE.Mesh(SPH, sFt.core.material); scene.add(sFt.toeCap); }
@@ -1241,7 +1246,7 @@ function shapeHand(h) {
     h.fingers.forEach((f, i) => { f.a.position.set(0, -0.128, z[i] * 0.072); shapeBone(f.a, 0.047, 0.04, 0.995); f.b.position.y = -0.04; shapeBone(f.b, 0.045, 0.03, 0.995); });
     h.ta.position.set(0, -0.06, 0.1); shapeBone(h.ta, 0.046, 0.036, 0.995); h.tb.position.y = -0.036; shapeBone(h.tb, 0.043, 0.028, 0.995);
   } else {
-    h.g.scale.setScalar(1.55); h.palm.scale.set(0.02, 0.043, 0.042); h.palm.position.y = -0.04;
+    h.g.scale.setScalar(HUMAN.hand / 0.138); h.palm.scale.set(0.02, 0.043, 0.042); h.palm.position.y = -0.04;
     h.fingers.forEach((f, i) => { f.a.position.set(0, -0.074, z[i] * 0.027); shapeBone(f.a, 0.0095, 0.034, 1.05); f.b.position.y = -0.034; shapeBone(f.b, 0.0088, 0.03, 1.05); });
     h.ta.position.set(0, -0.03, 0.034); shapeBone(h.ta, 0.0105, 0.03, 1.05); h.tb.position.y = -0.03; shapeBone(h.tb, 0.0095, 0.026, 1.05);
   }
@@ -1318,7 +1323,7 @@ function drawStaff(playIdx = -1) {
   staff.width = r.width * dpr; staff.height = r.height * dpr; const g = staff.getContext("2d"); g.scale(dpr, dpr);
   const w = r.width, h = r.height, colW = w / SLOT_N, base = h - 22, sc = (base - 14) / 2.05;
   // the five Sutton lines: floor, knee, hip, shoulder, head
-  const lines = [[0.03, "feet"], [0.5, "knees"], [0.95, "hips"], [1.55, "shoulders"], [1.77, "head"]];
+  const lines = [[0.03, "feet"], [0.5, "knees"], [0.95, "hips"], [1.51, "shoulders"], [1.73, "head"]];
   g.font = "10px " + getComputedStyle(document.body).fontFamily; g.textBaseline = "middle";
   lines.forEach(([y, n]) => { g.strokeStyle = "#1d2a3d"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, base - y * sc); g.lineTo(w, base - y * sc); g.stroke(); });
   for (let i = 0; i < SLOT_N; i++) {
@@ -1381,13 +1386,13 @@ function bvh() {
   const chain = (ind, name, o, body) => `${ind}JOINT ${name}\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}\t${R3}\n${body}${ind}}\n`;
   const end = (ind, o) => `${ind}End Site\n${ind}{\n${ind}\tOFFSET ${o}\n${ind}}\n`;
   const B0 = bodyOf(slots.find(Boolean) || DEF), hw0 = B0.hw, cm = v => (v * 100).toFixed(2);
-  const armTxt = (s, side) => chain("\t\t\t\t\t", side + "Shoulder", off(new THREE.Vector3(s * 0.21, 0.1, 0)),
-    chain("\t\t\t\t\t\t", side + "Elbow", `0.00 ${cm(-0.27 * B0.aLen)} 0.00`, chain("\t\t\t\t\t\t\t", side + "Wrist", `0.00 ${cm(-0.25 * B0.aLen)} 0.00`, end("\t\t\t\t\t\t\t\t", "0.00 -9.00 0.00"))));
+  const armTxt = (s, side) => chain("\t\t\t\t\t", side + "Shoulder", off(new THREE.Vector3(s * HUMAN.shoulder, 0.1, 0)),
+    chain("\t\t\t\t\t\t", side + "Elbow", `0.00 ${cm(-HUMAN.upperArm * B0.aLen)} 0.00`, chain("\t\t\t\t\t\t\t", side + "Wrist", `0.00 ${cm(-HUMAN.forearm * B0.aLen)} 0.00`, end("\t\t\t\t\t\t\t\t", "0.00 -9.00 0.00"))));
   const legTxt = (s, side) => chain("\t", side + "Hip", off(new THREE.Vector3(s * hw0, 0, 0)),
-    chain("\t\t", side + "Knee", `0.00 ${cm(-0.47 * B0.lLen)} 0.00`, chain("\t\t\t", side + "Ankle", `0.00 ${cm(-0.47 * B0.lLen)} 0.00`, end("\t\t\t\t", "0.00 0.00 11.00"))));
+    chain("\t\t", side + "Knee", `0.00 ${cm(-HUMAN.thigh * B0.lLen)} 0.00`, chain("\t\t\t", side + "Ankle", `0.00 ${cm(-HUMAN.thigh * B0.lLen)} 0.00`, end("\t\t\t\t", "0.00 0.00 11.00"))));
   let txt = "HIERARCHY\nROOT Hips\n{\n\tOFFSET 0.00 0.00 0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n" +
-    chain("\t", "Spine", "0.00 0.00 0.00", chain("\t\t", "Spine1", `0.00 ${cm(0.17 * B0.sLen)} 0.00`, chain("\t\t\t", "Spine2", `0.00 ${cm(0.17 * B0.sLen)} 0.00`,
-      chain("\t\t\t\t", "Chest", `0.00 ${cm(0.16 * B0.sLen)} 0.00`, chain("\t\t\t\t\t", "Neck", "0.00 10.00 0.00", chain("\t\t\t\t\t\t", "Neck1", "0.00 4.50 0.00", chain("\t\t\t\t\t\t\t", "Neck2", "0.00 4.50 0.00",
+    chain("\t", "Spine", "0.00 0.00 0.00", chain("\t\t", "Spine1", `0.00 ${cm(HUMAN.spine1 * B0.sLen)} 0.00`, chain("\t\t\t", "Spine2", `0.00 ${cm(HUMAN.spine2 * B0.sLen)} 0.00`,
+      chain("\t\t\t\t", "Chest", `0.00 ${cm(HUMAN.chest * B0.sLen)} 0.00`, chain("\t\t\t\t\t", "Neck", "0.00 10.00 0.00", chain("\t\t\t\t\t\t", "Neck1", "0.00 4.50 0.00", chain("\t\t\t\t\t\t\t", "Neck2", "0.00 4.50 0.00",
         chain("\t\t\t\t\t\t\t\t", "Head", "0.00 13.00 0.00", end("\t\t\t\t\t\t\t\t\t", "0.00 12.00 0.00"))))) +
       armTxt(1, "Left") + armTxt(-1, "Right"))))) + legTxt(1, "Left") + legTxt(-1, "Right") + "}\n";
   txt += `MOTION\nFrames: ${frames}\nFrame Time: ${(1 / fps).toFixed(6)}\n`;
@@ -1435,7 +1440,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v23";
+const APP_VERSION = "sparky-v24";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
