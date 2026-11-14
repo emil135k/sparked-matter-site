@@ -156,6 +156,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="metro" class="on">Click track</button>
         <button id="groove" class="on">Auto bounce</button>
         <button id="lookBtn" title="Off: the bones, best for working out moves. On: the same bones wearing a teddy bear plushie suit, with a soft bouncy body.">Plushie suit: off</button>
+        <button id="glowBtn" title="The soft neon halo around the stick figure. Turn it off to see the true thickness of each limb when you are checking proportions.">Glow: on</button>
         <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" step="0.01" style="width:80px">
       </div>
@@ -254,7 +255,7 @@ try { if (localStorage.getItem("sparky-human") !== "1") { for (const k of ["spar
 const GROUPS = [
   { name: "Hips", cls: "hips", ctl: [
     ["hx", "Slide", -0.3, 0.3, 0.01, 0], ["hz", "Pop fwd/back", -0.2, 0.2, 0.01, 0],
-    ["hy", "Knee dip", 0, 0.55, 0.01, 0.03], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
+    ["hy", "Knee dip", 0, 0.55, 0.01, 0], ["hyaw", "Twist", -50, 50, 1, 0], ["hroll", "Tilt", -25, 25, 1, 0],
     ["turn", "Turn whole body", -720, 720, 5, 0],
     ["hw", "Hip width (whole dance)", 0.06, 0.16, 0.005, 0.09] ] },
   { name: "Body build (whole dance)", cls: "hips", ctl: [
@@ -270,9 +271,9 @@ const GROUPS = [
     ["htn", "Turn", -60, 60, 1, 0], ["htl", "Tilt", -30, 30, 1, 0], ["hnd", "Nod", -25, 25, 1, 0], ["lookL", "Eyes on L hand", 0, 1, 0.05, 0], ["lookR", "Eyes on R hand", 0, 1, 0.05, 0],
     ["nkx", "Neck slide", -0.07, 0.07, 0.005, 0], ["nkz", "Neck peck", -0.06, 0.07, 0.005, 0] ] },
   { name: "Left arm", cls: "arm", ctl: [
-    ["aLr", "Raise", 0, 175, 1, 25], ["aLs", "Swing fwd", -60, 170, 1, 0], ["aLb", "Elbow", -20, 160, 1, 40], ["aLf", "Forearm fwd", -60, 120, 1, 0], ["aLw", "Wrist", -80, 80, 1, 0], ["aLt", "Palm turn", -90, 90, 1, 0], ["gL", "Hand (fist to open)", 0, 1, 0.05, 0.7] ] },
+    ["aLr", "Raise", 0, 175, 1, 6], ["aLs", "Swing fwd", -60, 170, 1, 0], ["aLb", "Elbow", -20, 160, 1, 8], ["aLf", "Forearm fwd", -60, 120, 1, 0], ["aLw", "Wrist", -80, 80, 1, 0], ["aLt", "Palm turn", -90, 90, 1, 0], ["gL", "Hand (fist to open)", 0, 1, 0.05, 0.7] ] },
   { name: "Right arm", cls: "arm", ctl: [
-    ["aRr", "Raise", 0, 175, 1, 25], ["aRs", "Swing fwd", -60, 170, 1, 0], ["aRb", "Elbow", -20, 160, 1, 40], ["aRf", "Forearm fwd", -60, 120, 1, 0], ["aRw", "Wrist", -80, 80, 1, 0], ["aRt", "Palm turn", -90, 90, 1, 0], ["gR", "Hand (fist to open)", 0, 1, 0.05, 0.7] ] },
+    ["aRr", "Raise", 0, 175, 1, 6], ["aRs", "Swing fwd", -60, 170, 1, 0], ["aRb", "Elbow", -20, 160, 1, 8], ["aRf", "Forearm fwd", -60, 120, 1, 0], ["aRw", "Wrist", -80, 80, 1, 0], ["aRt", "Palm turn", -90, 90, 1, 0], ["gR", "Hand (fist to open)", 0, 1, 0.05, 0.7] ] },
   { name: "Legs & feet", cls: "leg", ctl: [
     ["fLx", "Left step", -0.25, 0.25, 0.01, 0], ["fRx", "Right step", -0.25, 0.25, 0.01, 0],
     ["fLy", "Left lift", 0, 0.3, 0.01, 0], ["fRy", "Right lift", 0, 0.3, 0.01, 0], ["fz", "Step fwd/back", -0.25, 0.25, 0.01, 0],
@@ -505,7 +506,7 @@ function setSeg(s, a, b, r) {
   }
   s.capA.position.copy(a); s.capA.scale.setScalar(r * 1.05);
 }
-const S = {}; ["shoulders", "hips", "pelL", "pelR"].forEach(k => S[k] = makeSeg(COL.teal));
+const S = {}; ["shoulders", "hips"].forEach(k => S[k] = makeSeg(COL.teal));
 // spine + neck: one smooth tube through the joints (Catmull-Rom), so bends read as curves, not broken sticks
 const SPINE_PTS = Array.from({ length: 7 }, (_, i) => new THREE.Vector3(0, 1 + i * 0.12, 0));
 const spineCurve = new THREE.CatmullRomCurve3(SPINE_PTS, false, "centripetal");
@@ -558,7 +559,8 @@ const headGlow = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 16), glowMat(
 const faceCanvas = document.createElement("canvas"); faceCanvas.width = faceCanvas.height = 256;
 const faceTex = new THREE.CanvasTexture(faceCanvas);
 const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: faceTex, transparent: true }));
-facePlane.position.z = 0.121; headGroup.add(headFill, headRing, headGlow, facePlane);
+facePlane.position.z = 0.109; headGroup.add(headFill, headRing, headGlow, facePlane);
+headRing.scale.x = 0.8; headFill.scale.set(0.8, 1, 0.9); headGlow.scale.set(0.8, 1, 0.9); facePlane.scale.x = 0.9;      // a real head is taller than it is wide
 let plushOn = false;
 function drawFace(ex) {
   const g = faceCanvas.getContext("2d"); g.clearRect(0, 0, 256, 256); g.lineCap = "round";
@@ -699,8 +701,6 @@ function poseCore(p0, bounce, ox, oz) {
   turnPivot.updateMatrixWorld(true);
   const pel = W3(root), hl = W3(hipL), hr = W3(hipR), c1 = W3(sp2), c2 = W3(sp3), ch = W3(chest), nb = W3(neckBase), n2 = W3(nk2), nk = W3(neckTop), hd = W3(headC);
   setSeg(S.hips, hl, hr, 0.02);
-  // the pelvis: hip joints sit at the sides, the crotch hangs about 3.5 inches lower in the middle. Drawing it shows where the torso really ends.
-  { const cr = new THREE.Vector3(0, -0.09, 0).applyQuaternion(root.getWorldQuaternion(_hq)).add(pel); setSeg(S.pelL, hl, cr, 0.02); setSeg(S.pelR, hr, cr, 0.02); } setSpine([pel, c1, c2, ch, nb, n2, nk]);
   const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
   setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setHand(handL, p.gL, p.aLt, p.handL);
   setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, p.gR, p.aRt, p.handR);
@@ -800,7 +800,8 @@ const slotLabel = i => i % SPB ? SUBS[i % SPB] : String(i / SPB + 1);           
 const slotCode = i => (Math.floor(i / SPB) + 1) + SUBS[i % SPB];                                             // "3", "3e", "3&", "3a"
 const slotName = i => i % SPB ? `the ${SUBS[i % SPB] === "&" ? "&" : '"' + SUBS[i % SPB] + '"'} of ${Math.floor(i / SPB) + 1}` : `count ${i / SPB + 1}`;
 const grow16 = arr => { const out = new Array(SLOT_N).fill(null); arr.forEach((s, i) => { if (s && i * 2 < SLOT_N) out[i * 2] = s; }); return out; };   // dances saved before the "e" and "a" boxes existed
-const P_ = (o) => ({ ...DEF, face: "smile", ...o });
+const READY = { aLr: 25, aRr: 25, aLb: 40, aRb: 40, hy: 0.03 };     // the dancer's ready stance the built-in dances were written from
+const P_ = (o) => ({ ...DEF, ...READY, face: "smile", ...o });
 const SAMPLE = [
   [0, P_(PRESETS["Hip pop L"])], [2, P_(PRESETS["Hip pop R"])], [4, P_({ ...PRESETS["Hip pop L"], face: "laugh" })], [6, P_({ ...PRESETS["Hip pop R"], face: "laugh" })],
   [8, P_(PRESETS["Body roll"])], [10, P_({ ...PRESETS["Body roll"], sl: -16, hz: 0.06, hnd: 8 })], [12, P_(PRESETS["Shimmy"])], [13, P_({ ...PRESETS["Shimmy"], syaw: -25, shL: 0, shR: 0.06 })],
@@ -1262,8 +1263,11 @@ function shapeHand(h) {
     h.ta.position.set(0, -0.03, 0.034); shapeBone(h.ta, 0.0105, 0.03, 1.05); h.tb.position.y = -0.03; shapeBone(h.tb, 0.0095, 0.026, 1.05);
   }
 }
+let glowOn = true; try { glowOn = localStorage.getItem("sparky-glow") !== "off"; } catch (e) {}
+document.getElementById("glowBtn").addEventListener("click", () => { glowOn = !glowOn; try { localStorage.setItem("sparky-glow", glowOn ? "on" : "off"); } catch (e) {} refreshLook(); });
 function refreshLook() {
-  const stick = !plushOn, glow = stick && !keyMode;
+  { const gb = document.getElementById("glowBtn"); gb.textContent = "Glow: " + (glowOn ? "on" : "off"); gb.classList.toggle("on", glowOn); }
+  const stick = !plushOn, glow = stick && !keyMode && glowOn;
   for (const k in S) { S[k].core.visible = S[k].capA.visible = stick; S[k].glow.visible = glow; if (S[k].toeCap) S[k].toeCap.visible = stick; }
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
   plush.visible = pHead.visible = plushOn; jig.ready = false; seatSp.ready = false;
@@ -1451,7 +1455,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v25";
+const APP_VERSION = "sparky-v26";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
