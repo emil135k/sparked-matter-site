@@ -156,6 +156,8 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="metro" class="on">Click track</button>
         <button id="groove" class="on">Auto bounce</button>
         <button id="lookBtn" title="Off: the bones, best for working out moves. On: the same bones wearing a teddy bear plushie suit, with a soft bouncy body.">Plushie suit: off</button>
+        <span id="seeWrap" hidden style="display:inline-flex; align-items:center; gap:6px"><label for="seeThru" class="small">Suit see-through</label>
+          <input type="range" id="seeThru" min="0" max="0.9" step="0.05" value="0" style="width:120px" title="Fade the suit so you can see where the dancer's skeleton sits inside it."><output id="seeOut" class="small" style="min-width:34px">0%</output></span>
         <button id="glowBtn" title="The soft neon halo around the stick figure. Turn it off to see the true thickness of each limb when you are checking proportions.">Glow: on</button>
         <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" step="0.01" style="width:80px">
@@ -1079,7 +1081,7 @@ function poseAt(pos) {               // pos in boxes (quarter-beats), wraps over
 let shownFace = "smile";
 // ---------- teddy bear look: a soft body worn over the same skeleton ----------
 // The stick figure stays the working view. The bear reads the same joints every frame, so every move, count and hand sign carries over.
-scene.add(new THREE.HemisphereLight(0xffffff, 0x51465e, 0.95)); { const sun = new THREE.DirectionalLight(0xffffff, 0.55); sun.position.set(2, 4, 3); scene.add(sun); }
+{ const hemi = new THREE.HemisphereLight(0xffffff, 0x51465e, 0.95), sun = new THREE.DirectionalLight(0xffffff, 0.55); sun.position.set(2, 4, 3); hemi.layers.enableAll(); sun.layers.enableAll(); scene.add(hemi, sun); }
 const furMat = new THREE.MeshLambertMaterial({ color: 0xc98a4b }), creamMat = new THREE.MeshLambertMaterial({ color: 0xf3dfb8 }), noseMat = new THREE.MeshLambertMaterial({ color: 0x3a2418 });
 const SPH2 = new THREE.SphereGeometry(1, 32, 22), CYL2 = new THREE.CylinderGeometry(1, 1, 1, 22, 1, true);
 const plush = new THREE.Group(); plush.visible = false; scene.add(plush);
@@ -1265,16 +1267,40 @@ function shapeHand(h) {
 }
 let glowOn = true; try { glowOn = localStorage.getItem("sparky-glow") !== "off"; } catch (e) {}
 document.getElementById("glowBtn").addEventListener("click", () => { glowOn = !glowOn; try { localStorage.setItem("sparky-glow", glowOn ? "on" : "off"); } catch (e) {} refreshLook(); });
+// See-through suit. The suit lives on its own drawing layer. When it is faded, the stage and skeleton are drawn first, then the suit is drawn
+// in two steps (depth only, then colour) so you see just its nearest surface as one clean tinted shell with the skeleton inside.
+let see = 0; try { see = Math.max(0, Math.min(0.9, parseFloat(localStorage.getItem("sparky-see")) || 0)); } catch (e) {}
+const SUIT = 1, depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false });
+camera.layers.enable(SUIT);
+function suitMats(fn) { const seen = new Set(), visit = o => { if (o.isMesh) for (const m of [].concat(o.material)) if (!seen.has(m)) { seen.add(m); fn(m); } };
+  plush.traverse(visit); pHead.traverse(visit); visit(faceWrap); if (plushOn) for (const h of [handL, handR]) h.g.traverse(o => { if (o !== h.glow) visit(o); }); }
+function applySee() { const on = plushOn && see > 0.01;
+  plush.traverse(o => o.layers.set(SUIT)); pHead.traverse(o => o.layers.set(SUIT)); faceWrap.layers.set(SUIT);
+  for (const h of [handL, handR]) h.g.traverse(o => o.layers.set(plushOn && o !== h.glow ? SUIT : 0));
+  suitMats(m => { if (m.userData.t0 === undefined) m.userData.t0 = m.transparent; m.transparent = on || m.userData.t0; m.opacity = on ? 1 - see : 1; m.depthWrite = on ? false : !m.userData.t0; m.needsUpdate = true; });
+  for (const h of [handL, handR]) if (!plushOn) { h.mat.transparent = false; h.mat.opacity = 1; h.mat.depthWrite = true; h.mat.needsUpdate = true; }
+  document.getElementById("seeWrap").hidden = !plushOn; document.getElementById("seeThru").value = see; document.getElementById("seeOut").textContent = Math.round(see * 100) + "%"; }
+document.getElementById("seeThru").addEventListener("input", e => { see = parseFloat(e.target.value) || 0; try { localStorage.setItem("sparky-see", see); } catch (err) {} refreshLook(); });
+function draw() {
+  if (!(plushOn && see > 0.01)) { renderer.autoClear = true; camera.layers.enable(0); camera.layers.enable(SUIT); renderer.render(scene, camera); return; }
+  const bg = scene.background;
+  renderer.autoClear = true; camera.layers.set(0); renderer.render(scene, camera);                 // stage and skeleton
+  renderer.autoClear = false; scene.background = null; camera.layers.set(SUIT);
+  const fw = faceWrap.visible; faceWrap.visible = false;                                         // the face is a mostly clear sticker: it must not block the head behind it
+  renderer.clearDepth(); scene.overrideMaterial = depthOnly; renderer.render(scene, camera);       // where the suit's nearest surface is
+  faceWrap.visible = fw; scene.overrideMaterial = null; renderer.render(scene, camera);                                    // tint that surface only
+  scene.background = bg; renderer.autoClear = true; camera.layers.enable(0); camera.layers.enable(SUIT);
+}
 function refreshLook() {
   { const gb = document.getElementById("glowBtn"); gb.textContent = "Glow: " + (glowOn ? "on" : "off"); gb.classList.toggle("on", glowOn); }
-  const stick = !plushOn, glow = stick && !keyMode && glowOn;
+  const stick = !plushOn || see > 0.01, glow = !plushOn && !keyMode && glowOn;
   for (const k in S) { S[k].core.visible = S[k].capA.visible = stick; S[k].glow.visible = glow; if (S[k].toeCap) S[k].toeCap.visible = stick; }
   spineCore.visible = spineCapLow.visible = headFill.visible = headRing.visible = stick; spineGlow.visible = headGlow.visible = glow;
   plush.visible = pHead.visible = plushOn; jig.ready = false; seatSp.ready = false;
   pHead.scale.setScalar(1.4); pHead.position.y = 0.04; facePlane.visible = !plushOn; faceWrap.visible = plushOn;
   for (const h of [handL, handR]) { h.glow.visible = glow; h.g.traverse(m => { if (m.isMesh && m !== h.glow) m.material = plushOn ? furMat : h.mat; }); shapeHand(h); }
   const b = document.getElementById("lookBtn"); b.textContent = "Plushie suit: " + (plushOn ? "on" : "off"); b.classList.toggle("on", plushOn);
-  drawFace(shownFace);
+  drawFace(shownFace); applySee();
 }
 document.getElementById("lookBtn").addEventListener("click", () => { plushOn = !plushOn; try { localStorage.setItem("sparky-look", plushOn ? "bear" : "stick"); } catch (e) {} refreshLook(); });
 
@@ -1299,7 +1325,7 @@ function frame(now) {
   applyPose(p, bounce); handEase(now); plushUpdate(now);
   const tsec = now / 1000;
   cubes.forEach(c => { c.rotation.x = tsec * c.userData.sp; c.rotation.y = tsec * c.userData.sp * 0.7; c.position.y = c.userData.y0 + 0.08 * Math.sin(tsec * c.userData.sp * 2 + c.userData.ph); });
-  placeCam(); renderer.render(scene, camera); requestAnimationFrame(frame);
+  placeCam(); draw(); requestAnimationFrame(frame);
 }
 
 // ---------- dance card in/out ----------
@@ -1455,7 +1481,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v27";
+const APP_VERSION = "sparky-v28";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
