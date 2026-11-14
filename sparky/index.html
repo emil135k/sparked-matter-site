@@ -700,7 +700,7 @@ function poseCore(p0, bounce, ox, oz) {
   }
   turnPivot.updateMatrixWorld(true);
   const pel = W3(root), hl = W3(hipL), hr = W3(hipR), c1 = W3(sp2), c2 = W3(sp3), ch = W3(chest), nb = W3(neckBase), n2 = W3(nk2), nk = W3(neckTop), hd = W3(headC);
-  setSeg(S.hips, hl, hr, 0.02);
+  setSeg(S.hips, hl, hr, 0.02); setSpine([pel, c1, c2, ch, nb, n2, nk]);
   const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
   setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setHand(handL, p.gL, p.aLt, p.handL);
   setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, p.gR, p.aRt, p.handR);
@@ -1455,7 +1455,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v26";
+const APP_VERSION = "sparky-v27";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
