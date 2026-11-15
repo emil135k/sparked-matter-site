@@ -211,7 +211,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="sampleBtn2" title="A four eight-count dancehall routine made for Bam Bam (122 BPM). This replaces the routine on screen.">Sparky's demo dance 2</button>
         <button id="sampleBtn3" title="Two eight-counts that show off the whole-body turn: he turns his back, shakes, and spins round to the front. Best with the Mascot bear character. This replaces the routine on screen.">Demo dance 3 (spins)</button>
         <button id="clipBtn" title="Play a motion captured from a video with the Sparky BVH Toolkit (a .bvh file). Sparky dances it exactly, frame by frame.">Load motion (BVH)…</button>
-        <input type="file" id="clipFile" accept=".bvh,text/plain" hidden>
+        <input type="file" id="clipFile" hidden>
         <button id="copyCard">Copy dance card</button>
       </div>
     </div>
@@ -1415,7 +1415,10 @@ function openClip(name, txt) {
   } catch (e) { setStatus("That BVH doesn't match Sparky's skeleton (" + e.message + "). Use a file made by the Sparky BVH Toolkit or copied from the Studio."); }
 }
 document.getElementById("clipBtn").addEventListener("click", () => document.getElementById("clipFile").click());
-document.getElementById("clipFile").addEventListener("change", e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => openClip(f.name, t)); e.target.value = ""; });
+document.getElementById("clipFile").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  // no file-type filter on the picker: iPhones don't know .bvh and grey those files out, so the file is checked here instead
+  if (f.size > 60e6) { setStatus(f.name + " is too big to be a motion clip."); return; }
+  f.text().then(t => { if (!/^\s*HIERARCHY/.test(t)) { setStatus(f.name + " isn't a BVH motion file. Pick a .bvh made by the Sparky BVH Toolkit."); return; } openClip(f.name, t); }); });
 document.getElementById("clipSpeed").addEventListener("change", e => { if (!CLIP) return; CLIP.speed = +e.target.value; CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; });
 document.getElementById("clipPos").addEventListener("input", e => { if (!CLIP) return; CLIP.at = +e.target.value * CLIP.len; CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; });
 document.getElementById("clipOff").addEventListener("click", () => { stopPlay(); CLIP = null; document.getElementById("clipRow").hidden = true; setStatus("Back to the counts."); });
@@ -1574,7 +1577,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v29";
+const APP_VERSION = "sparky-v30";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
