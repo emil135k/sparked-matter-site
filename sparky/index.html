@@ -193,6 +193,14 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <div id="pageTabs" class="tabs" role="group" aria-label="Which eight-count you are editing"></div>
         <button id="pageCopy" title="Make a copy of this eight-count right after it, so you can change a few moves instead of starting over">Copy to a new one</button>
       </div>
+      <div class="trow" id="clipRow" hidden style="border:1px solid var(--teal); border-radius:12px; padding:8px 10px">
+        <strong id="clipName" style="color:var(--teal)"></strong>
+        <label class="small" for="clipSpeed">Speed</label>
+        <select id="clipSpeed"><option value="1">Full speed</option><option value="0.5">Half speed</option><option value="0.333">One third</option><option value="0.25">Quarter</option></select>
+        <input type="range" id="clipPos" min="0" max="1" step="0.001" value="0" style="flex:1 1 160px" aria-label="Where in the motion clip">
+        <output id="clipTime" class="small" style="min-width:90px">0.0 s</output>
+        <button id="clipOff" title="Go back to the counts and poses">Close clip</button>
+      </div>
       <div class="small" id="pageHelp" style="margin:-2px 0 8px">Play runs through them in order and starts over. Tap a number to edit that eight-count.</div>
       <div class="slots" id="slots"></div>
       <div class="trow">
@@ -202,6 +210,8 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="sampleBtn" title="Bring back Sparky's built-in demo dance. This replaces the routine on screen.">Sparky's demo dance</button>
         <button id="sampleBtn2" title="A four eight-count dancehall routine made for Bam Bam (122 BPM). This replaces the routine on screen.">Sparky's demo dance 2</button>
         <button id="sampleBtn3" title="Two eight-counts that show off the whole-body turn: he turns his back, shakes, and spins round to the front. Best with the Mascot bear character. This replaces the routine on screen.">Demo dance 3 (spins)</button>
+        <button id="clipBtn" title="Play a motion captured from a video with the Sparky BVH Toolkit (a .bvh file). Sparky dances it exactly, frame by frame.">Load motion (BVH)…</button>
+        <input type="file" id="clipFile" accept=".bvh,text/plain" hidden>
         <button id="copyCard">Copy dance card</button>
       </div>
     </div>
@@ -1049,6 +1059,7 @@ function showCoach(beats) {
   [...cstrip.children].forEach(sp => sp.classList.toggle("lit", !pre && +sp.dataset.f === cur[0]));
 }
 function startPlay() {
+  if (CLIP) { playing = true; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary"); CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; return; }
   if (!anyPose() && !lvl && !beatOn && !trackBuf) { setStatus("Save at least one pose first."); return; }
   playing = true; lastTick = -1; playBtn.textContent = "■ Stop"; playBtn.classList.remove("primary");
   const lead = countIn && (beatOn || lvl || trackBuf) ? 4 : 0; stopTrack();                                  // count-in starts on 5 so the 1 lands after "8"
@@ -1322,11 +1333,93 @@ function frame(now) {
     rings.forEach(r => r.material.opacity = 0);
     document.getElementById("countNow").textContent = (Math.floor(sel / SPB) + 1) + (sel % SPB ? " " + SUBS[sel % SPB] : "");
   }
-  applyPose(p, bounce); handEase(now); plushUpdate(now);
+  if (CLIP) clipFrame(now); else applyPose(p, bounce);
+  handEase(now); plushUpdate(now);
   const tsec = now / 1000;
   cubes.forEach(c => { c.rotation.x = tsec * c.userData.sp; c.rotation.y = tsec * c.userData.sp * 0.7; c.position.y = c.userData.y0 + 0.08 * Math.sin(tsec * c.userData.sp * 2 + c.userData.ph); });
   placeCam(); draw(); requestAnimationFrame(frame);
 }
+
+// ---------- motion clips (BVH from the Sparky BVH Toolkit, or any BVH on the Studio skeleton) ----------
+// The clip drives Sparky's joints directly, frame by frame, so every detail of the captured motion comes through.
+let CLIP = null;
+const CLIP_JOINTS = ["Hips", "Spine", "Spine1", "Spine2", "Chest", "Neck", "Neck1", "Neck2", "Head", "LeftShoulder", "LeftElbow", "LeftWrist",
+  "RightShoulder", "RightElbow", "RightWrist", "LeftHip", "LeftKnee", "LeftAnkle", "RightHip", "RightKnee", "RightAnkle"];
+function parseBVH(txt) {
+  const [head, mot] = txt.split(/\bMOTION\b/); if (!mot) throw new Error("no MOTION section");
+  const names = [], offs = {}; let m; const re = /(ROOT|JOINT)\s+(\S+)\s*\{\s*OFFSET\s+([-\d.eE]+)\s+([-\d.eE]+)\s+([-\d.eE]+)/g;
+  while ((m = re.exec(head))) { names.push(m[2]); offs[m[2]] = new THREE.Vector3(+m[3], +m[4], +m[5]).multiplyScalar(0.01); }
+  const miss = CLIP_JOINTS.filter(n => !names.includes(n)); if (miss.length) throw new Error("missing joints: " + miss.join(", "));
+  const lines = mot.trim().split(/\n/); const nF = +(lines[0].match(/Frames:\s*(\d+)/) || [])[1], ft = +(lines[1].match(/Frame Time:\s*([\d.eE-]+)/) || [])[1];
+  if (!nF || !ft) throw new Error("no frame count or frame time");
+  const E = new THREE.Euler(), frames = [];
+  for (let f = 0; f < nF; f++) {
+    const v = (lines[2 + f] || "").trim().split(/\s+/).map(Number); if (v.length < 3 + names.length * 3) break;
+    const q = {}; names.forEach((n, k) => { const o = 3 + k * 3;
+      E.set(v[o + 1] * D2R, v[o + 2] * D2R, v[o] * D2R, "ZXY"); q[n] = new THREE.Quaternion().setFromEuler(E); });   // channels are Z X Y
+    frames.push({ pos: new THREE.Vector3(v[0], v[1], v[2]).multiplyScalar(0.01), q });
+  }
+  return { frames, ft, offs, len: frames.length * ft };
+}
+const _cq = new THREE.Quaternion(), _cq2 = new THREE.Quaternion(), _cv = new THREE.Vector3();
+function clipPose(t) {
+  const F = CLIP.frames, x = Math.max(0, t / CLIP.ft), i = Math.min(F.length - 1, Math.floor(x)), j = Math.min(F.length - 1, i + 1), u = x - i;
+  const A = F[i], B = F[j], q = n => _cq.copy(A.q[n]).slerp(B.q[n], u);
+  turnPivot.rotation.y = 0;
+  root.position.copy(A.pos).lerp(B.pos, u);
+  root.quaternion.copy(q("Hips"));
+  [[sp1, "Spine"], [sp2, "Spine1"], [sp3, "Spine2"], [chest, "Chest"], [neckBase, "Neck"], [nk2, "Neck1"], [neckTop, "Neck2"]].forEach(([o, n]) => o.quaternion.copy(q(n)));
+  headC.quaternion.copy(q("Head"));
+  sp2.position.y = HUMAN.spine1; sp3.position.y = HUMAN.spine2; chest.position.y = HUMAN.chest;
+  for (const [a, S_] of [[armL, "Left"], [armR, "Right"]]) {
+    a.sh.position.set(a.side * HUMAN.shoulder, 0.1, 0); a.el.position.y = -HUMAN.upperArm; a.wr.position.y = -HUMAN.forearm;
+    a.sh.quaternion.copy(q(S_ + "Shoulder")); a.el.quaternion.copy(q(S_ + "Elbow")); a.wr.quaternion.copy(q(S_ + "Wrist"));
+  }
+  hipL.position.set(HUMAN.hip, 0, 0); hipR.position.set(-HUMAN.hip, 0, 0);
+  turnPivot.updateMatrixWorld(true);
+  const pel = W3(root), hl = W3(hipL), hr = W3(hipR);
+  setSeg(S.hips, hl, hr, 0.02); setSpine([pel, W3(sp2), W3(sp3), W3(chest), W3(neckBase), W3(nk2), W3(neckTop)]);
+  const sl_ = W3(armL.sh), sr_ = W3(armR.sh); setSeg(S.shoulders, sl_, sr_, 0.02);
+  setSeg(S.uaL, sl_, W3(armL.el), 0.02); setSeg(S.faL, W3(armL.el), W3(armL.wr), 0.019); setHand(handL, 0.7, 0, "");
+  setSeg(S.uaR, sr_, W3(armR.el), 0.02); setSeg(S.faR, W3(armR.el), W3(armR.wr), 0.019); setHand(handR, 0.7, 0, "");
+  headGroup.position.copy(W3(headC)); headC.getWorldQuaternion(headGroup.quaternion);
+  const rq = root.getWorldQuaternion(new THREE.Quaternion());
+  for (const [side, S_, h] of [["L", "Left", hl], ["R", "Right", hr]]) {
+    const g1 = rq.clone().multiply(q(S_ + "Hip")), knee = h.clone().add(_cv.set(0, -HUMAN.thigh, 0).applyQuaternion(g1));
+    const g2 = g1.clone().multiply(q(S_ + "Knee")), foot = knee.clone().add(_cv.set(0, -HUMAN.shin, 0).applyQuaternion(g2));
+    const g3 = g2.clone().multiply(q(S_ + "Ankle")); const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(g3); fwd.y = 0;
+    if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, 1); fwd.normalize();
+    legFK(h, knee, foot, fwd, side === "L" ? S.thL : S.thR, side === "L" ? S.shinL : S.shinR, side === "L" ? S.ftL : S.ftR);
+  }
+  COM.c.copy(centerOfMass()); const g = support(); COM.ok = g.length > 0 && nearestSupport(COM.c, g).distanceTo(COM.c.clone().setY(0)) < 0.06; comMark(g);
+}
+function legFK(h, knee, foot, fwd, sTh, sSh, sFt) {        // draw a leg from captured joint positions (no knee solving)
+  setSeg(sTh, h, knee, 0.021); setSeg(sSh, knee, foot, 0.02);
+  const left = sTh === S.thL, toe = foot.clone().add(fwd.clone().multiplyScalar(0.11));
+  if (!sFt.toeCap) { sFt.toeCap = new THREE.Mesh(SOLE_GEO, sFt.core.material); scene.add(sFt.toeCap); sFt.core.scale.setScalar(0); sFt.glow.scale.setScalar(0); sFt.capA.scale.setScalar(0); }
+  _sx.crossVectors(UP, fwd).normalize(); _sz.crossVectors(_sx, UP).normalize(); _sm.makeBasis(_sx, UP, _sz); sFt.toeCap.quaternion.setFromRotationMatrix(_sm);
+  sFt.toeCap.scale.set(left ? 1 : -1, 1, 1); sFt.toeCap.position.copy(foot); sFt.toeCap.position.y = foot.y - 0.03;
+  LEGS[left ? "L" : "R"] = { hip: h.clone(), knee: knee.clone(), foot: foot.clone(), toe };
+}
+function clipFrame(now) {
+  if (playing) { CLIP.at = ((now - CLIP.t0) / 1000 * CLIP.speed) % CLIP.len; }
+  clipPose(CLIP.at);
+  const pos = document.getElementById("clipPos"); if (document.activeElement !== pos) pos.value = CLIP.at / CLIP.len;
+  document.getElementById("clipTime").textContent = CLIP.at.toFixed(1) + " / " + CLIP.len.toFixed(1) + " s";
+  document.getElementById("countNow").textContent = CLIP.at.toFixed(1) + "s";
+}
+function openClip(name, txt) {
+  try { const c = parseBVH(txt); stopPlay(); CLIP = { ...c, name, at: 0, speed: +document.getElementById("clipSpeed").value || 1, t0: 0 };
+    document.getElementById("clipRow").hidden = false; document.getElementById("clipName").textContent = "Motion clip: " + name;
+    setStatus(`Loaded ${name}: ${c.frames.length} frames, ${c.len.toFixed(1)} seconds. Press Play. The counts below are paused while a clip is open.`);
+  } catch (e) { setStatus("That BVH doesn't match Sparky's skeleton (" + e.message + "). Use a file made by the Sparky BVH Toolkit or copied from the Studio."); }
+}
+document.getElementById("clipBtn").addEventListener("click", () => document.getElementById("clipFile").click());
+document.getElementById("clipFile").addEventListener("change", e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => openClip(f.name, t)); e.target.value = ""; });
+document.getElementById("clipSpeed").addEventListener("change", e => { if (!CLIP) return; CLIP.speed = +e.target.value; CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; });
+document.getElementById("clipPos").addEventListener("input", e => { if (!CLIP) return; CLIP.at = +e.target.value * CLIP.len; CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; });
+document.getElementById("clipOff").addEventListener("click", () => { stopPlay(); CLIP = null; document.getElementById("clipRow").hidden = true; setStatus("Back to the counts."); });
+window.sparkyOpenClip = openClip;
 
 // ---------- dance card in/out ----------
 function card() {
@@ -1481,7 +1574,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v28";
+const APP_VERSION = "sparky-v29";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
