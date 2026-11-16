@@ -40,6 +40,7 @@ h1 { font-family: var(--display); font-weight: 600; font-size: 28px; margin: 0; 
 .stage { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
   background: radial-gradient(ellipse at 50% 70%, #0f2a2e 0%, var(--bg) 70%); min-height: 320px; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#bonesC { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .views { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
 .hint { position: absolute; bottom: 10px; left: 12px; color: var(--muted); font-size: 12px; }
 .coach { position: absolute; top: 50px; left: 14px; text-align: left; pointer-events: none; display: none; }
@@ -132,6 +133,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
   <div class="left">
     <div class="stage">
       <canvas id="c" aria-label="3D dancer stage. Drag to orbit, scroll to zoom."></canvas>
+      <canvas id="bonesC" aria-hidden="true" hidden></canvas>
       <div class="views">
         <button data-view="front">Front</button><button data-view="three">¾</button><button data-view="side">Side</button>
       </div>
@@ -158,6 +160,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="lookBtn" title="Off: the bones, best for working out moves. On: the same bones wearing a teddy bear plushie suit, with a soft bouncy body.">Plushie suit: off</button>
         <span id="seeWrap" hidden style="display:inline-flex; align-items:center; gap:6px"><label for="seeThru" class="small">Suit see-through</label>
           <input type="range" id="seeThru" min="0" max="0.9" step="0.05" value="0" style="width:120px" title="Fade the suit so you can see where the dancer's skeleton sits inside it."><output id="seeOut" class="small" style="min-width:34px">0%</output></span>
+        <button id="bonesBtn" title="Show the Sparky 22 skeleton on top of Sparky: every bone and joint, labelled with its name (the same names Blender and the BVH files use).">Bones: off</button>
         <button id="glowBtn" title="The soft neon halo around the stick figure. Turn it off to see the true thickness of each limb when you are checking proportions.">Glow: on</button>
         <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
         <label class="small" for="bpm">BPM</label><input type="number" id="bpm" value="117" min="60" max="180" step="0.01" style="width:80px">
@@ -1367,7 +1370,7 @@ function frame(now) {
   handEase(now); plushUpdate(now);
   const tsec = now / 1000;
   cubes.forEach(c => { c.rotation.x = tsec * c.userData.sp; c.rotation.y = tsec * c.userData.sp * 0.7; c.position.y = c.userData.y0 + 0.08 * Math.sin(tsec * c.userData.sp * 2 + c.userData.ph); });
-  placeCam(); draw(); requestAnimationFrame(frame);
+  placeCam(); draw(); if (bonesOn) drawBones(); requestAnimationFrame(frame);
 }
 
 // Sparky 22 bones <-> the Studio's joints. Export and import both go through these two functions.
@@ -1482,6 +1485,66 @@ document.getElementById("clipSpeed").addEventListener("change", e => { if (!CLIP
 document.getElementById("clipPos").addEventListener("input", e => { if (!CLIP) return; CLIP.at = +e.target.value * CLIP.len; CLIP.t0 = performance.now() - CLIP.at * 1000 / CLIP.speed; });
 document.getElementById("clipOff").addEventListener("click", () => { stopPlay(); CLIP = null; document.getElementById("clipRow").hidden = true; setStatus("Back to the counts."); });
 window.sparkyOpenClip = openClip;
+
+// ---------- Bones view: the Sparky 22 skeleton drawn over the stage, each joint labelled ----------
+let bonesOn = false; try { bonesOn = localStorage.getItem("sparky-bones") === "on"; } catch (e) {}
+const bonesC = document.getElementById("bonesC"), _bwq = new THREE.Quaternion();
+function bonePoints() {                 // where every Sparky 22 joint is right now (world space), plus the end tips
+  const q = o => o.getWorldQuaternion(new THREE.Quaternion()), at = (o, v) => W3(o).add(v.applyQuaternion(q(o)));
+  const J = { Hips: W3(root), Spine: W3(sp1), Spine1: W3(sp2), Spine2: W3(sp3), Neck: W3(neckBase), Head: W3(neckTop), _headTop: at(neckTop, new THREE.Vector3(0, 0.25, 0)) };
+  for (const [a, S_] of [[armL, "Left"], [armR, "Right"]]) {
+    J[S_ + "Shoulder"] = W3(a.clav); J[S_ + "Arm"] = W3(a.sh); J[S_ + "ForeArm"] = W3(a.el); J[S_ + "Hand"] = W3(a.wr); J["_" + S_ + "HandEnd"] = at(a.wr, new THREE.Vector3(0, -HUMAN.hand, 0));
+  }
+  for (const [k, S_] of [["L", "Left"], ["R", "Right"]]) { const L = LEGS[k]; if (!L) continue;
+    const fwd = L.toe.clone().sub(L.foot).setY(0); if (fwd.lengthSq() < 1e-8) fwd.set(0, 0, 1); fwd.normalize(); const fq = footWorldQ(fwd);
+    J[S_ + "UpLeg"] = L.hip.clone(); J[S_ + "Leg"] = L.knee.clone(); J[S_ + "Foot"] = L.foot.clone();
+    J[S_ + "ToeBase"] = L.foot.clone().add(new THREE.Vector3(0, -0.04, 0.14).applyQuaternion(fq)); J["_" + S_ + "ToeEnd"] = J[S_ + "ToeBase"].clone().add(new THREE.Vector3(0, 0, 0.07).applyQuaternion(fq));
+  }
+  return J;
+}
+function drawBones() {
+  const r = bonesC.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (bonesC.width !== Math.round(r.width * dpr) || bonesC.height !== Math.round(r.height * dpr)) { bonesC.width = Math.round(r.width * dpr); bonesC.height = Math.round(r.height * dpr); }
+  const g = bonesC.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+  const J = bonePoints(), P2 = {}, v = new THREE.Vector3();
+  for (const k in J) { v.copy(J[k]).project(camera); P2[k] = [(v.x + 1) / 2 * r.width, (1 - v.y) / 2 * r.height, v.z]; }
+  const col = n => n.includes("Left") ? "#f0c060" : n.includes("Right") ? "#ee7a6e" : "#5fd3c4";      // Sparky's left gold, right coral, middle teal
+  const seg = (a, b, c) => { if (!P2[a] || !P2[b]) return; g.strokeStyle = "rgba(5,10,20,.85)"; g.lineWidth = 6; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke();
+    g.strokeStyle = c; g.lineWidth = 2.5; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke(); };
+  g.lineCap = "round";
+  for (const bn of SKEL) {               // each bone runs from its joint to each child's joint (or to its end tip)
+    const kids = SKEL.filter(x => x.parent === bn.name).map(x => x.name);
+    const tip = { Head: "_headTop", LeftHand: "_LeftHandEnd", RightHand: "_RightHandEnd", LeftToeBase: "_LeftToeEnd", RightToeBase: "_RightToeEnd" }[bn.name];
+    (tip ? [tip] : kids).forEach(k => seg(bn.name, k, col(bn.name)));
+  }
+  // joints and names; joints at the same spot share one label (Hips and Spine sit together)
+  const groups = [];
+  for (const bn of SKEL) { const p = P2[bn.name]; if (!p) continue; const gp = groups.find(x => Math.hypot(x.p[0] - p[0], x.p[1] - p[1]) < 5); if (gp) gp.n.push(bn.name); else groups.push({ p, n: [bn.name] }); }
+  const cx = P2.Hips[0], fs = r.width < 480 ? 10 : 11, lh = fs * 1.45, placed = [];
+  g.font = `600 ${fs}px ${getComputedStyle(document.body).fontFamily}`; g.textBaseline = "middle";
+  const hits = (x, y, w) => placed.some(q => x < q[0] + q[2] + 4 && x + w + 4 > q[0] && Math.abs(y - q[1]) < lh);
+  for (const gp of groups) { const [x, y] = gp.p; g.fillStyle = "rgba(5,10,20,.9)"; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); g.fillStyle = col(gp.n[0]); g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); }
+  // labels: start beside the joint (outer side of the body), slide up or down a line at a time until they don't overlap another label
+  groups.sort((A, B) => A.p[1] - B.p[1]);
+  for (const gp of groups) {
+    const [x, y] = gp.p, c = col(gp.n[0]), label = gp.n.join(" · "), w = g.measureText(label).width;
+    const pref = gp.n[0].includes("Left") || (!gp.n[0].includes("Right") && x >= cx) ? 1 : -1;
+    let best = null;
+    for (const side of [pref, -pref]) { for (const k of [0, 1, -1, 2, -2, 3, -3, 4]) { const lx = side > 0 ? x + 12 : x - 12 - w, ly = y + k * lh;
+      if (!hits(lx, ly, w)) { best = [lx, ly, side]; break; } } if (best) break; }
+    if (!best) best = [pref > 0 ? x + 12 : x - 12 - w, y, pref];
+    const [lx, ly, side] = best; placed.push([lx, ly, w]);
+    if (Math.abs(ly - y) > 1) { g.strokeStyle = c; g.globalAlpha = 0.6; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(side > 0 ? lx - 3 : lx + w + 3, ly); g.stroke(); g.globalAlpha = 1; }
+    g.fillStyle = "rgba(5,10,20,.78)"; g.fillRect(lx - 3, ly - fs * 0.7, w + 6, fs * 1.4); g.fillStyle = c; g.fillText(label, lx, ly);
+  }
+  // colour key, under the Front / ¾ / Side buttons
+  const ky = 54; g.fillStyle = "rgba(5,10,20,.78)"; g.fillRect(8, ky - 10, 226, 20);
+  g.fillStyle = "#5fd3c4"; g.fillText("Sparky 22", 13, ky); g.fillStyle = "#f0c060"; g.fillText("Sparky's left", 82, ky); g.fillStyle = "#ee7a6e"; g.fillText("Sparky's right", 160, ky);
+}
+function showBones() { const b = document.getElementById("bonesBtn"); b.textContent = "Bones: " + (bonesOn ? "on" : "off"); b.classList.toggle("on", bonesOn); bonesC.hidden = !bonesOn; }
+document.getElementById("bonesBtn").addEventListener("click", () => { bonesOn = !bonesOn; try { localStorage.setItem("sparky-bones", bonesOn ? "on" : "off"); } catch (e) {} showBones(); });
+showBones();
+
 
 // ---------- dance card in/out ----------
 function card() {
@@ -1618,7 +1681,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v31";
+const APP_VERSION = "sparky-v32";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
