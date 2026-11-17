@@ -824,7 +824,7 @@ const SOLE_GEO = (() => { const H = HUMAN.heel, T = HUMAN.toes, sh = new THREE.S
   g.rotateX(Math.PI / 2); g.translate(0, 0.022, 0); return g; })();
 const _sx = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 function placeSole(sFt, foot, fq, left) {      // the sneaker sole: under the ankle pivot by the ankle height, turned (and tipped) with the foot
-  sFt.toeCap.quaternion.copy(fq); sFt.toeCap.scale.set(left ? 1 : -1, 1, 1);
+  sFt.toeCap.quaternion.copy(fq); sFt.toeCap.scale.set(left ? 1 : -1, 1, 1); sFt.toeCap.visible = sFt.core.visible;   // hidden with the stick figure (costume on)
   sFt.toeCap.position.copy(foot).add(new THREE.Vector3(0, -ANK, 0).applyQuaternion(fq));
   // the heel strut: from the ankle pivot down and slightly back to the top of the sole (Sparky 24's heel bone, drawn)
   const hb = SKEL.find(b => b.name === "LeftHeel").offset(SKB);
@@ -1272,7 +1272,7 @@ function plushUpdate(now) {
       sp[i] = x * f; sp[i + 1] = y * f; sp[i + 2] = z * f; }
     skullGeo.attributes.position.needsUpdate = true; skullGeo.computeVertexNormals(); pSkull.userData.dented = dented;
   }
-  for (const k of ["L", "R"]) { const L = { ...LEGS[k], foot: LEGS[k].base }, f = pFoot[k], pad = pPad[k];
+  for (const k of ["L", "R"]) { const L = { ...LEGS[k], foot: LEGS[k].base, toe: LEGS[k].toe.clone().add(new THREE.Vector3(0, OLD_ANK - ANK, 0)) }, f = pFoot[k], pad = pPad[k];   // costume feet: old ankle spot, aimed level
     const ankle = L.knee.clone().sub(L.foot).normalize().multiplyScalar(0.1).add(L.foot);              // stop the leg just above the ankle, inside the foot
     const CONE = P.cone ?? 0, shoe = CONE > 0.5, sh = pShoe[k];
     setLimb(PL["leg" + k], L.hip, L.knee, ankle, FOLD, 0.13 + 0.075 * CONE, 0.13 - 0.062 * CONE, 0.36 * (P.drop ?? 0));
@@ -1724,7 +1724,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v33";
+const APP_VERSION = "sparky-v34";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
