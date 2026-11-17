@@ -826,15 +826,15 @@ const _sx = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matr
 function placeSole(sFt, foot, fq, left) {      // the sneaker sole: under the ankle pivot by the ankle height, turned (and tipped) with the foot
   sFt.toeCap.quaternion.copy(fq); sFt.toeCap.scale.set(left ? 1 : -1, 1, 1); sFt.toeCap.visible = sFt.core.visible;   // hidden with the stick figure (costume on)
   sFt.toeCap.position.copy(foot).add(new THREE.Vector3(0, -ANK, 0).applyQuaternion(fq));
-  // the heel strut: from the ankle pivot down and slightly back to the top of the sole (Sparky 24's heel bone, drawn)
-  const hb = SKEL.find(b => b.name === "LeftHeel").offset(SKB);
-  setSeg(sFt, foot, foot.clone().add(new THREE.Vector3(0, hb[1] + 0.035, hb[2] * 0.6).applyQuaternion(fq)), 0.019);
+  // the foot is drawn as an upside-down T: a straight upright from the ankle down to the sole, and the flat sole itself
+  setSeg(sFt, foot, foot.clone().add(new THREE.Vector3(0, -ANK + 0.035, 0).applyQuaternion(fq)), 0.019);
 }
 function footPoints(h, knee, foot, fq, toe) {  // Sparky 24 foot: ankle pivot, heel and ball where the shoe meets the floor, toe tip
   const at = v => foot.clone().add(new THREE.Vector3(...v).applyQuaternion(fq));
   const o = n => SKEL.find(b => b.name === n), heel = at(o("LeftHeel").offset(SKB)), ball = at(o("LeftToeBase").offset(SKB));
   const tip = ball.clone().add(new THREE.Vector3(...o("LeftToeBase").end(SKB)).applyQuaternion(fq));
-  return { hip: h.clone(), knee: knee.clone(), foot: foot.clone(), toe, fq: fq.clone(), heel, ball, tip,
+  const under = at([0, -ANK, 0]);
+  return { hip: h.clone(), knee: knee.clone(), foot: foot.clone(), toe, fq: fq.clone(), heel, ball, tip, under,
            base: foot.clone().add(new THREE.Vector3(0, OLD_ANK - ANK, 0)) };    // the old ankle spot, for costume parts placed from it
 }
 function footWorldQ(fwd) { _sx.crossVectors(UP, fwd).normalize(); _sz.crossVectors(_sx, UP).normalize(); _sm.makeBasis(_sx, UP, _sz); return new THREE.Quaternion().setFromRotationMatrix(_sm); }
@@ -1522,7 +1522,7 @@ function bonePoints() {                 // where every Sparky 24 joint is right 
   for (const [k, S_] of [["L", "Left"], ["R", "Right"]]) { const L = LEGS[k]; if (!L) continue;
     J[S_ + "UpLeg"] = L.hip.clone(); J[S_ + "Leg"] = L.knee.clone(); J[S_ + "Foot"] = L.foot.clone();
     J[S_ + "ToeBase"] = L.ball.clone(); J["_" + S_ + "ToeEnd"] = L.tip.clone(); J[S_ + "Heel"] = L.heel.clone();
-    J["_" + S_ + "HeelEnd"] = L.heel.clone().add(new THREE.Vector3(0, 0, -0.015).applyQuaternion(L.fq));
+    J["_" + S_ + "HeelEnd"] = L.heel.clone().add(new THREE.Vector3(0, 0, -0.015).applyQuaternion(L.fq)); J["_" + S_ + "Under"] = L.under.clone();
   }
   return J;
 }
@@ -1539,6 +1539,9 @@ function drawBones() {
   drawContacts(g, J, P2, col);
   if (!bonesOn) return;
   for (const bn of SKEL) {               // each bone runs from its joint to each child's joint (or to its end tip)
+    const side = bn.name.startsWith("Left") ? "Left" : "Right";
+    if (/(Left|Right)Foot$/.test(bn.name)) { seg(bn.name, "_" + side + "Under", col(bn.name)); seg("_" + side + "HeelEnd", "_" + side + "ToeEnd", col(bn.name)); continue; }   // the foot's T
+    if (/(ToeBase|Heel)$/.test(bn.name)) continue;                                   // already part of the sole bar
     const kids = SKEL.filter(x => x.parent === bn.name).map(x => x.name);
     const tip = { Head: "_headTop", LeftHand: "_LeftHandEnd", RightHand: "_RightHandEnd", LeftToeBase: "_LeftToeEnd", RightToeBase: "_RightToeEnd", LeftHeel: "_LeftHeelEnd", RightHeel: "_RightHeelEnd" }[bn.name];
     (tip ? [tip] : kids).forEach(k => seg(bn.name, k, col(bn.name)));
@@ -1577,8 +1580,6 @@ function drawContacts(g, J, P2, col) {
   for (const S_ of ["Left", "Right"]) {
     const heel = J[S_ + "Heel"], ball = J[S_ + "ToeBase"]; if (!heel || !ball) continue;
     if (heel.y < 0.015) ring(heel); if (ball.y < 0.015) ring(ball);
-    if (bonesOn && P2[S_ + "Heel"] && P2[S_ + "ToeBase"]) {          // the sole: where the shoe meets the floor, heel to ball
-      g.setLineDash([5, 4]); g.strokeStyle = col(S_); g.lineWidth = 1.5; g.beginPath(); g.moveTo(...P2[S_ + "Heel"].slice(0, 2)); g.lineTo(...P2[S_ + "ToeBase"].slice(0, 2)); g.stroke(); g.setLineDash([]); }
   }
 }
 function showBones() { const b = document.getElementById("bonesBtn"); b.textContent = "Bones: " + (bonesOn ? "on" : "off"); b.classList.toggle("on", bonesOn);
@@ -1724,7 +1725,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v34";
+const APP_VERSION = "sparky-v35";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
