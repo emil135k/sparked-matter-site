@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Links | Sparked Matter LLC</title>
+    <meta name="description" content="Emil Rivas · Sparked Matter LLC, St. Petersburg, FL. Hands-on hardware, open source AI. Every way to find, follow and book Sparked Matter.">
+    <meta property="og:title" content="Sparked Matter · Links">
+    <meta property="og:description" content="Hands-on hardware. Open source intelligence. From edge to action.">
+    <meta property="og:url" content="https://sparkedmatter.com/links/">
+    <meta property="og:type" content="website">
+    <link rel="canonical" href="https://sparkedmatter.com/links/">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --navy:       #0D1B2A;
+            --navy-mid:   #162336;
+            --copper:     #C96A1F;
+            --copper-lt:  #E07B39;
+            --steel:      #4A6FA5;
+            --mono: 'Courier New', Courier, monospace;
+            --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        }
+
+        html { background: var(--navy); }
+
+        body {
+            font-family: var(--sans);
+            color: #fff;
+            min-height: 100vh;
+            line-height: 1.5;
+            background:
+                radial-gradient(ellipse at 15% 20%, rgba(201,106,31,.20) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 90%, rgba(74,111,165,.28) 0%, transparent 50%),
+                var(--navy);
+            padding: 48px 16px 40px;
+        }
+
+        .card {
+            max-width: 520px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .badge {
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            background: var(--navy-mid);
+            border: 2px solid var(--copper);
+            box-shadow: 0 0 0 6px rgba(201,106,31,.15), 0 0 32px rgba(224,123,57,.35);
+        }
+
+        .eyebrow {
+            font-family: var(--mono);
+            font-size: .85rem;
+            font-weight: 700;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--copper-lt);
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            margin-bottom: 6px;
+        }
+
+        .tagline {
+            color: rgba(255,255,255,.72);
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+        .tagline em { font-style: normal; color: var(--copper-lt); }
+
+        .where {
+            font-family: var(--mono);
+            font-size: .8rem;
+            color: rgba(255,255,255,.5);
+            margin-bottom: 30px;
+        }
+
+        .links { list-style: none; display: grid; gap: 12px; }
+
+        .links a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 60px;
+            padding: 12px 18px;
+            text-decoration: none;
+            color: #fff;
+            text-align: left;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.14);
+            border-left: 4px solid var(--copper);
+            transition: background .18s, border-color .18s, transform .18s;
+        }
+        .links a:hover, .links a:focus-visible {
+            background: rgba(201,106,31,.16);
+            border-color: var(--copper-lt);
+            transform: translateY(-1px);
+            outline: none;
+        }
+        .links a.primary {
+            background: var(--copper);
+            border-color: var(--copper);
+        }
+        .links a.primary:hover, .links a.primary:focus-visible { background: var(--copper-lt); }
+
+        .emoji { font-size: 1.5rem; width: 32px; text-align: center; flex: 0 0 auto; }
+        .label { display: block; font-weight: 700; font-size: 1rem; }
+        .sub { display: block; font-size: .85rem; color: rgba(255,255,255,.65); }
+        .primary .sub { color: rgba(255,255,255,.88); }
+
+        .motto {
+            margin-top: 34px;
+            font-family: var(--mono);
+            font-size: .82rem;
+            letter-spacing: .06em;
+            color: rgba(255,255,255,.55);
+        }
+
+        footer {
+            margin-top: 18px;
+            font-size: .78rem;
+            color: rgba(255,255,255,.4);
+        }
+        footer a { color: rgba(255,255,255,.55); }
+
+        @media (prefers-reduced-motion: reduce) {
+            .links a { transition: none; }
+            .links a:hover { transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="badge" aria-hidden="true">⚡</div>
+        <span class="eyebrow">Sparked Matter LLC</span>
+        <h1>Emil Rivas</h1>
+        <p class="tagline">Hands-On Hardware. <em>Open Source Intelligence.</em></p>
+        <p class="where">St. Petersburg, FL · English &amp; Español</p>
+
+        <ul class="links">
+            <li><a class="primary" href="https://cal.com/sparkedmatter">
+                <span class="emoji" aria-hidden="true">☕</span>
+                <span><span class="label">Book a Coffee Chat</span><span class="sub">Bring your idea or your problem. Let's spark something.</span></span>
+            </a></li>
+            <li><a href="https://www.youtube.com/@SparkedMatter">
+                <span class="emoji" aria-hidden="true">▶️</span>
+                <span><span class="label">YouTube · @SparkedMatter</span><span class="sub">63, ex-trucker, building with AI from a lunar lander</span></span>
+            </a></li>
+            <li><a href="/">
+                <span class="emoji" aria-hidden="true">🌐</span>
+                <span><span class="label">sparkedmatter.com</span><span class="sub">Marine, agriculture, edge AI and what I build</span></span>
+            </a></li>
+            <li><a href="/sparky/">
+                <span class="emoji" aria-hidden="true">💃</span>
+                <span><span class="label">Sparky's Dance Studio</span><span class="sub">Meet Sparky, the Sparked Matter dancer</span></span>
+            </a></li>
+            <li><a href="tel:+17274556170">
+                <span class="emoji" aria-hidden="true">📞</span>
+                <span><span class="label">Call or text</span><span class="sub">(727) 455-6170</span></span>
+            </a></li>
+            <li><a href="mailto:info@sparkedmatter.com">
+                <span class="emoji" aria-hidden="true">✉️</span>
+                <span><span class="label">Email</span><span class="sub">info@sparkedmatter.com</span></span>
+            </a></li>
+            <li><a href="https://www.linkedin.com/in/sparkedmatterllc">
+                <span class="emoji" aria-hidden="true">🔗</span>
+                <span><span class="label">LinkedIn</span><span class="sub">30+ years of engineering, 517K flatbed miles</span></span>
+            </a></li>
+        </ul>
+
+        <p class="motto">Open road · Open code · Open hardware</p>
+        <footer>
+            © 2026 Sparked Matter LLC · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        </footer>
+    </main>
+</body>
+</html>
