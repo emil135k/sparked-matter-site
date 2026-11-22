@@ -189,7 +189,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="ownBtn" title="Play any MP3 or audio file from this device. The file stays on your device.">Load your music…</button>
         <input type="file" id="ownFile" accept="audio/*,.mp3,.m4a,.wav" hidden>
         <span class="small" id="trackCredit"></span>
-        <span class="small" id="status">Sample routine loaded: 8 counts.</span>
+        <span class="small" id="status">Sparky's Bam Bam dance is loaded. Press Play.</span>
       </div>
       <div class="trow" id="pageRow">
         <label for="pageN" class="small">Eight-counts in this dance:</label>
@@ -911,7 +911,8 @@ const SAMPLE3 = (() => {
 function loadSample2() { pages = SAMPLE2.map(q => q.map(s => s && { ...s })); pg = 0; slots = pages[0]; }
 function loadSample() { slots = new Array(SLOT_N).fill(null); SAMPLE.forEach(([i, p]) => slots[i * 2] = p); pages = [slots]; pg = 0; }
 try { const saved = JSON.parse(localStorage.getItem("sparky-routine") || "null"); if (saved && (saved.pages || saved.slots)) { const fix = arr => { let q = arr.map(s => s && { ...DEF, face: "smile", ...s }); return q.length !== SLOT_N ? grow16(q) : q; };
-  pages = (saved.pages && saved.pages.length ? saved.pages : [saved.slots]).slice(0, MAX_PAGES).map(fix); pg = 0; slots = pages[0]; document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else loadSample(); } catch (e) { loadSample(); }
+  pages = (saved.pages && saved.pages.length ? saved.pages : [saved.slots]).slice(0, MAX_PAGES).map(fix); pg = 0; slots = pages[0]; document.getElementById("bpm").value = saved.bpm || 117; setStatus("Your last routine is loaded."); } else firstDance(); } catch (e) { firstDance(); }
+function firstDance() { loadSample2(); document.getElementById("bpm").value = 122; setStatus("Sparky's Bam Bam dance is loaded: four eight-counts at 122 BPM. Press Play."); }
 function persist() { try { localStorage.setItem("sparky-routine", JSON.stringify({ bpm: bpm(), pages, slots: pages[0] })); } catch (e) {} }
 const slotBox = document.getElementById("slots"); const slotEls = [];
 for (let i = 0; i < SLOT_N; i++) { const b = document.createElement("button"); b.className = "slot" + (i % SPB ? " and" : "") + (i % 2 ? " fine" : ""); b.textContent = slotLabel(i);
@@ -1725,7 +1726,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v35";
+const APP_VERSION = "sparky-v36";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
