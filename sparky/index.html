@@ -1734,7 +1734,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 // The song plays in YouTube's own embedded player (streamed and licensed by YouTube); Sparky follows its clock.
 var YTD = null;
 (function () {
-  const q = new URLSearchParams(location.search), DEMOS = { bambam: { id: "a9OopCd1gpE", bpm: 122, name: "Sister Nancy, “Bam Bam” (official audio, VP Records)" } };
+  const q = new URLSearchParams(location.search), DEMOS = { bambam: { id: "i34pFNr42mc", bpm: 124, name: "HUGEL, “Jamaican (Bam Bam)”" } };
   const d = DEMOS[q.get("demo")] || (q.get("yt") ? { id: q.get("yt"), bpm: +q.get("bpm") || bpm(), name: "YouTube video" } : null);
   if (!d) return;
   const key = "sparky-yt-offset:" + d.id;
@@ -1774,7 +1774,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v38";
+const APP_VERSION = "sparky-v39";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
