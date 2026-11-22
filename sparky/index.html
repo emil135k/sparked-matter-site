@@ -1078,14 +1078,17 @@ let phaseT; phaseEl.addEventListener("input", () => { const T = TRACKS.own; if (
 typeable(phaseOut, -4, 4, () => (TRACKS.own ? TRACKS.own.phase : 0), v => { phaseEl.value = v; phaseEl.dispatchEvent(new Event("input")); });
 document.getElementById("phaseZero").addEventListener("click", () => { phaseEl.value = 0; phaseEl.dispatchEvent(new Event("input")); });
 document.getElementById("ownBtn").addEventListener("click", () => ownFile.click());
-ownFile.addEventListener("change", async () => {
-  const file = ownFile.files && ownFile.files[0]; ownFile.value = ""; if (!file) return;
-  stopPlay(); creditEl.textContent = "Listening for the beat…";
+// the last song you loaded is kept on this device (IndexedDB), so it's ready next time without picking it again
+const songDB = () => new Promise((ok, no) => { const r = indexedDB.open("sparky-music", 1); r.onupgradeneeded = () => r.result.createObjectStore("songs"); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+async function rememberSong(name, bytes) { try { const db = await songDB(); db.transaction("songs", "readwrite").objectStore("songs").put({ name, bytes }, "last"); } catch (e) {} }
+async function recallSong() { try { const db = await songDB(); return await new Promise(ok => { const q = db.transaction("songs").objectStore("songs").get("last"); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); } catch (e) { return null; } }
+async function useSong(raw, name, restored) {
+  stopPlay(); creditEl.textContent = restored ? "Getting your last song ready…" : "Listening for the beat…";
   try {
-    audio(); const raw = await file.arrayBuffer();
+    audio(); if (!restored) rememberSong(name, raw.slice(0));
     const buf = await new Promise((ok, no) => actx.decodeAudioData(raw, ok, no));
     await new Promise(r => setTimeout(r, 30));                       // let the "Listening…" note paint first
-    const b = findBeat(buf), name = file.name.replace(/\.[^.]+$/, "");
+    const b = findBeat(buf);
     let saved = null; try { saved = JSON.parse(localStorage.getItem("sparky-sync:" + name) || "null"); } catch (e) {}
     if (saved && saved.bpm) b.bpm = saved.bpm;
     TRACKS.own = { own: true, name, bpm: b.bpm, first: b.first, first0: b.first, phase: saved && +saved.phase || 0, loopBeats: 8, buf, once: !document.getElementById("ownLoop").classList.contains("on"), credit: "Your file. It stays on this device." };
@@ -1093,9 +1096,14 @@ ownFile.addEventListener("change", async () => {
     trackKey = "own"; trackBuf = buf; document.getElementById("bpm").value = b.bpm; persist(); phaseEl.value = TRACKS.own.phase; ownFit();
     if (beatOn) document.getElementById("beatBtn").click();
     creditEl.textContent = TRACKS.own.credit; ownRow.hidden = false;
-    setStatus(`${name} loaded at ${b.bpm} BPM. Press Play, then slide Music timing until the count matches.`);
-  } catch (e) { creditEl.textContent = "Couldn't read that file: " + (e && e.message || e); }
+    setStatus(restored ? `${name} is ready from last time, at ${b.bpm} BPM. Press Play.` : `${name} loaded at ${b.bpm} BPM. Press Play, then slide Music timing until the count matches. It will be ready here next time too.`);
+  } catch (e) { creditEl.textContent = restored ? "" : "Couldn't read that file: " + (e && e.message || e); }
+}
+ownFile.addEventListener("change", async () => {
+  const file = ownFile.files && ownFile.files[0]; ownFile.value = ""; if (!file) return;
+  useSong(await file.arrayBuffer(), file.name.replace(/\.[^.]+$/, ""), false);
 });
+recallSong().then(song => { if (song && song.bytes && !trackKey) useSong(song.bytes, song.name, true); });
 document.getElementById("ownLoop").addEventListener("click", e => { const on = e.currentTarget.classList.toggle("on"); if (TRACKS.own) { TRACKS.own.once = !on; ownFit(); resyncTrack(); } });
 document.getElementById("bpm").addEventListener("change", () => { if (trackKey === "own") { ownFit(); resyncTrack(); } });
 function schedule() {                                                               // keep ~0.12 s of steps queued on the audio clock
@@ -1726,7 +1734,7 @@ unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationF
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v36";
+const APP_VERSION = "sparky-v37";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
