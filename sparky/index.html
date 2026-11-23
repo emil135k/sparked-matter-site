@@ -1726,7 +1726,7 @@ paintSlots = function (playIdx = -1) { _paint(playIdx); if (!staff.hidden) drawS
 const _persist = persist;
 persist = function () { _persist(); rebuildScore(); };
 
-try { plushOn = localStorage.getItem("sparky-look") === "bear"; } catch (e) {}
+plushOn = true; try { plushOn = localStorage.getItem("sparky-look") !== "stick"; } catch (e) {}   // the bear is the default look; only an explicit "stick" choice keeps the bones
 refreshLook(); drawTabs();
 unifyBody(); syncUI(); rebuildScore(); paintSlots(); resize(); requestAnimationFrame(frame);
 
@@ -1774,7 +1774,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v39";
+const APP_VERSION = "sparky-v40";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
