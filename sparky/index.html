@@ -1560,6 +1560,8 @@ function drawBones() {
     const m = octaBone(nb++); m.visible = true; m.material.color.set(c); m.position.copy(A); m.scale.set(len, len, len);
     m.quaternion.setFromUnitVectors(UP, _d.divideScalar(len));
     for (const [k, P] of [[a, A], [b, B]]) if (!jointsDone.has(k)) { jointsDone.add(k); const s = octaJoint(nj++); s.visible = true; s.material.color.set(c); s.position.copy(P); s.scale.setScalar(Math.max(0.012, Math.min(0.022, len * 0.09))); } };
+  const dashed = (a, b, c) => { if (!P2[a] || !P2[b]) return; g.save(); g.setLineDash([4, 4]); g.strokeStyle = c; g.globalAlpha = 0.85; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke(); g.restore(); };
   const seg = (a, b, c) => { if (bonesMode === 2) return octa(a, b, c); if (!P2[a] || !P2[b]) return; g.strokeStyle = "rgba(5,10,20,.85)"; g.lineWidth = 6; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke();
     g.strokeStyle = c; g.lineWidth = 2.5; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke(); };
   g.lineCap = "round";
@@ -1571,7 +1573,10 @@ function drawBones() {
     if (/(ToeBase|Heel)$/.test(bn.name)) continue;                                   // already part of the sole bar
     const kids = SKEL.filter(x => x.parent === bn.name).map(x => x.name);
     const tip = { Head: "_headTop", LeftHand: "_LeftHandEnd", RightHand: "_RightHandEnd", LeftToeBase: "_LeftToeEnd", RightToeBase: "_RightToeEnd", LeftHeel: "_LeftHeelEnd", RightHeel: "_RightHeelEnd" }[bn.name];
-    (tip ? [tip] : kids).forEach(k => seg(bn.name, k, col(bn.name)));
+    if (bonesMode === 2 && !tip && kids.length > 1) {                                   // 3D: one solid bone toward the main child (Spine2 to Neck, Hips to Spine);
+      const main = kids.find(k => /^(Spine|Neck|Head)/.test(k)) || kids[0];               // the other children hang off it, shown as dashed "attached to" lines like Blender
+      seg(bn.name, main, col(bn.name)); kids.filter(k => k !== main).forEach(k => dashed(bn.name, k, col(k)));
+    } else (tip ? [tip] : kids).forEach(k => seg(bn.name, k, col(bn.name)));
   }
   hideOcta(nb, nj);
   // joints and names; joints at the same spot share one label (Hips and Spine sit together)
@@ -1794,7 +1799,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v41";
+const APP_VERSION = "sparky-v42";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
