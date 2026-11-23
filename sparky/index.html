@@ -160,7 +160,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
         <button id="lookBtn" title="Off: the bones, best for working out moves. On: the same bones wearing a teddy bear plushie suit, with a soft bouncy body.">Plushie suit: off</button>
         <span id="seeWrap" hidden style="display:inline-flex; align-items:center; gap:6px"><label for="seeThru" class="small">Suit see-through</label>
           <input type="range" id="seeThru" min="0" max="0.9" step="0.05" value="0" style="width:120px" title="Fade the suit so you can see where the dancer's skeleton sits inside it."><output id="seeOut" class="small" style="min-width:34px">0%</output></span>
-        <button id="bonesBtn" title="Show the Sparky 24 skeleton on top of Sparky: every bone and joint, labelled with its name (the same names Blender and the BVH files use), with heel and ball pivots and floor contact.">Bones: off</button>
+        <button id="bonesBtn" title="Tap to cycle: off, lines, 3D. Shows the Sparky 24 skeleton on top of Sparky (3D draws each bone as an octahedron like Blender and Maya): every bone and joint, labelled with its name (the same names Blender and the BVH files use), with heel and ball pivots and floor contact.">Bones: off</button>
         <button id="contactBtn" title="Show a ring on the floor under each heel and ball of the foot that is pressing on the floor.">Floor contact: off</button>
         <button id="glowBtn" title="The soft neon halo around the stick figure. Turn it off to see the true thickness of each limb when you are checking proportions.">Glow: on</button>
         <button id="keyBtn" title="For making videos: a flat color behind Sparky that a video editor can remove, so he can be placed on top of another video.">Video background: off</button>
@@ -1520,7 +1520,20 @@ document.getElementById("clipOff").addEventListener("click", () => { stopPlay();
 window.sparkyOpenClip = openClip;
 
 // ---------- Bones view: the Sparky 24 skeleton drawn over the stage, each joint labelled ----------
-let bonesOn = false; try { bonesOn = localStorage.getItem("sparky-bones") === "on"; } catch (e) {}
+let bonesMode = 0; try { bonesMode = { on: 1, "3d": 2 }[localStorage.getItem("sparky-bones")] || 0; } catch (e) {}   // 0 off, 1 flat lines, 2 3D octahedral
+let bonesOn = bonesMode > 0;
+// 3D bones, the way Blender, Maya and Cascadeur draw them: an elongated octahedron per bone (fat square end at the parent joint,
+// pointing to the child) with a sphere on each joint. Drawn "in front" so they show through the plushie suit like an X-ray.
+const OCTA_GEO = (() => { const h = 0.1, w = 0.07, v = [[0, 0, 0], [w, h, 0], [0, h, w], [-w, h, 0], [0, h, -w], [0, 1, 0]].map(q => new THREE.Vector3(...q));   // square 10% along the bone, 14% of its length across
+  const f = [[0, 2, 1], [0, 3, 2], [0, 4, 3], [0, 1, 4], [5, 1, 2], [5, 2, 3], [5, 3, 4], [5, 4, 1]], pos = [];
+  f.forEach(t => t.forEach(i => pos.push(v[i].x, v[i].y, v[i].z)));
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; })();
+const OCTA_EDGE = new THREE.EdgesGeometry(OCTA_GEO), octaPool = [], octaJoints = [];
+const octaMat = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true, transparent: true, opacity: 0.92, depthTest: false });
+function octaBone(i) { if (!octaPool[i]) { const m = new THREE.Mesh(OCTA_GEO, octaMat(0xffffff)); m.add(new THREE.LineSegments(OCTA_EDGE, new THREE.LineBasicMaterial({ color: 0x0a1424, depthTest: false })));
+    m.renderOrder = 998; m.children[0].renderOrder = 999; m.frustumCulled = false; scene.add(m); octaPool[i] = m; } return octaPool[i]; }
+function octaJoint(i) { if (!octaJoints[i]) { const m = new THREE.Mesh(SPH, octaMat(0xffffff)); m.renderOrder = 999; scene.add(m); octaJoints[i] = m; } return octaJoints[i]; }
+function hideOcta(fromB, fromJ) { for (let i = fromB; i < octaPool.length; i++) octaPool[i].visible = false; for (let i = fromJ; i < octaJoints.length; i++) octaJoints[i].visible = false; }
 const bonesC = document.getElementById("bonesC"), _bwq = new THREE.Quaternion();
 function bonePoints() {                 // where every Sparky 24 joint is right now (world space), plus the end tips
   const q = o => o.getWorldQuaternion(new THREE.Quaternion()), at = (o, v) => W3(o).add(v.applyQuaternion(q(o)));
@@ -1542,11 +1555,16 @@ function drawBones() {
   const J = bonePoints(), P2 = {}, v = new THREE.Vector3();
   for (const k in J) { v.copy(J[k]).project(camera); P2[k] = [(v.x + 1) / 2 * r.width, (1 - v.y) / 2 * r.height, v.z]; }
   const col = n => n.includes("Left") ? "#f0c060" : n.includes("Right") ? "#ee7a6e" : "#5fd3c4";      // Sparky's left gold, right coral, middle teal
-  const seg = (a, b, c) => { if (!P2[a] || !P2[b]) return; g.strokeStyle = "rgba(5,10,20,.85)"; g.lineWidth = 6; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke();
+  let nb = 0, nj = 0; const jointsDone = new Set(), _d = new THREE.Vector3();
+  const octa = (a, b, c) => { const A = J[a], B = J[b]; if (!A || !B) return; _d.subVectors(B, A); const len = _d.length(); if (len < 1e-4) return;
+    const m = octaBone(nb++); m.visible = true; m.material.color.set(c); m.position.copy(A); m.scale.set(len, len, len);
+    m.quaternion.setFromUnitVectors(UP, _d.divideScalar(len));
+    for (const [k, P] of [[a, A], [b, B]]) if (!jointsDone.has(k)) { jointsDone.add(k); const s = octaJoint(nj++); s.visible = true; s.material.color.set(c); s.position.copy(P); s.scale.setScalar(Math.max(0.012, Math.min(0.022, len * 0.09))); } };
+  const seg = (a, b, c) => { if (bonesMode === 2) return octa(a, b, c); if (!P2[a] || !P2[b]) return; g.strokeStyle = "rgba(5,10,20,.85)"; g.lineWidth = 6; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke();
     g.strokeStyle = c; g.lineWidth = 2.5; g.beginPath(); g.moveTo(...P2[a].slice(0, 2)); g.lineTo(...P2[b].slice(0, 2)); g.stroke(); };
   g.lineCap = "round";
   drawContacts(g, J, P2, col);
-  if (!bonesOn) return;
+  if (!bonesOn) { hideOcta(0, 0); return; }
   for (const bn of SKEL) {               // each bone runs from its joint to each child's joint (or to its end tip)
     const side = bn.name.startsWith("Left") ? "Left" : "Right";
     if (/(Left|Right)Foot$/.test(bn.name)) { seg(bn.name, "_" + side + "Under", col(bn.name)); seg("_" + side + "HeelEnd", "_" + side + "ToeEnd", col(bn.name)); continue; }   // the foot's T
@@ -1555,6 +1573,7 @@ function drawBones() {
     const tip = { Head: "_headTop", LeftHand: "_LeftHandEnd", RightHand: "_RightHandEnd", LeftToeBase: "_LeftToeEnd", RightToeBase: "_RightToeEnd", LeftHeel: "_LeftHeelEnd", RightHeel: "_RightHeelEnd" }[bn.name];
     (tip ? [tip] : kids).forEach(k => seg(bn.name, k, col(bn.name)));
   }
+  hideOcta(nb, nj);
   // joints and names; joints at the same spot share one label (Hips and Spine sit together)
   const groups = [];
   for (const bn of SKEL) { const p = P2[bn.name]; if (!p) continue; const gp = groups.find(x => Math.hypot(x.p[0] - p[0], x.p[1] - p[1]) < 5); if (gp) gp.n.push(bn.name); else groups.push({ p, n: [bn.name] }); }
@@ -1591,11 +1610,12 @@ function drawContacts(g, J, P2, col) {
     if (heel.y < 0.015) ring(heel); if (ball.y < 0.015) ring(ball);
   }
 }
-function showBones() { const b = document.getElementById("bonesBtn"); b.textContent = "Bones: " + (bonesOn ? "on" : "off"); b.classList.toggle("on", bonesOn);
+function showBones() { bonesOn = bonesMode > 0; if (!bonesOn) hideOcta(0, 0);
+  const b = document.getElementById("bonesBtn"); b.textContent = "Bones: " + ["off", "lines", "3D"][bonesMode]; b.classList.toggle("on", bonesOn);
   const c = document.getElementById("contactBtn"); c.textContent = "Floor contact: " + (contactsOn || bonesOn ? "on" : "off"); c.classList.toggle("on", contactsOn || bonesOn); c.disabled = bonesOn;
   bonesC.hidden = !(bonesOn || contactsOn); }
 document.getElementById("contactBtn").addEventListener("click", () => { contactsOn = !contactsOn; try { localStorage.setItem("sparky-contacts", contactsOn ? "on" : "off"); } catch (e) {} showBones(); });
-document.getElementById("bonesBtn").addEventListener("click", () => { bonesOn = !bonesOn; try { localStorage.setItem("sparky-bones", bonesOn ? "on" : "off"); } catch (e) {} showBones(); });
+document.getElementById("bonesBtn").addEventListener("click", () => { bonesMode = (bonesMode + 1) % 3; try { localStorage.setItem("sparky-bones", ["off", "on", "3d"][bonesMode]); } catch (e) {} showBones(); });
 showBones();
 
 
@@ -1774,7 +1794,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v40";
+const APP_VERSION = "sparky-v41";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
