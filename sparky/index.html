@@ -1810,7 +1810,7 @@ var YTD = null;
   });
   if (d.start || q.get("bpm")) showTap();
   // ?autoplay=1: start right away with the sound off (the only autoplay browsers allow), plus one big button that brings the sound in
-  const auto = q.get("autoplay") === "1";
+  const auto = q.get("autoplay") === "1" || (q.get("demo") === "bambam" && q.get("autoplay") !== "0");   // Bam Bam always autostarts; &autoplay=0 turns it off
   let soundBtn = null;
   if (auto) {
     soundBtn = document.createElement("button"); soundBtn.type = "button"; soundBtn.textContent = "\u{1F50A} Tap for sound";
@@ -1838,7 +1838,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v46";
+const APP_VERSION = "sparky-v47";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
