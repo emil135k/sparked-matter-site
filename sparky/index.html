@@ -260,6 +260,8 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
 
 <script src="./three.min.js"></script>
 <script>
+// the plain Studio link (no settings in it) opens the Bam Bam demo, the link people were sent to test. ?studio=1 opens the bare Studio.
+if (!location.search) history.replaceState(null, "", location.pathname + "?demo=bambam" + location.hash);
 (() => {
 const D2R = Math.PI / 180;
 // Body measurements at every slider's 1.0: a well-built six-foot man, 1 unit = 1 metre. The Blender suit is built from this same table.
@@ -1836,7 +1838,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v44";
+const APP_VERSION = "sparky-v45";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
