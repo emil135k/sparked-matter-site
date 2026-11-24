@@ -261,7 +261,7 @@ textarea { width: 100%; min-height: 70px; background: #0a1220; color: var(--ink)
 <script src="./three.min.js"></script>
 <script>
 // the plain Studio link (no settings in it) opens the Bam Bam demo, the link people were sent to test. ?studio=1 opens the bare Studio.
-if (!location.search) history.replaceState(null, "", location.pathname + "?demo=bambam&autoplay=1" + location.hash);
+if (!location.search) history.replaceState(null, "", location.pathname + "?demo=bambam" + location.hash);
 (() => {
 const D2R = Math.PI / 180;
 // Body measurements at every slider's 1.0: a well-built six-foot man, 1 unit = 1 metre. The Blender suit is built from this same table.
@@ -1839,7 +1839,7 @@ var YTD = null;
   });
   if (d.start || q.get("bpm")) showTap();
   // ?autoplay=1: start right away with the sound off (the only autoplay browsers allow), plus one big button that brings the sound in
-  const auto = q.get("autoplay") === "1" || (q.get("demo") === "bambam" && q.get("autoplay") !== "0");   // Bam Bam always autostarts; &autoplay=0 turns it off
+  const auto = q.get("autoplay") === "1";
   let soundBtn = null;
   if (auto) {
     soundBtn = document.createElement("button"); soundBtn.type = "button"; soundBtn.textContent = "\u{1F50A} Tap for sound";
@@ -1848,6 +1848,14 @@ var YTD = null;
     soundBtn.id = "sparkySound"; document.head.appendChild(st); document.body.appendChild(soundBtn);
     soundBtn.addEventListener("click", () => { if (!player || !player.unMute) return; player.unMute(); player.setVolume(100); if (player.getPlayerState() !== 1) player.playVideo(); soundBtn.remove(); });
   }
+  // Without autoplay: Sparky stands still and one big button starts it all. The tap is what lets the song play with sound.
+  let startBtn = null;
+  if (!auto) {
+    startBtn = document.createElement("button"); startBtn.type = "button"; startBtn.id = "sparkyStart"; startBtn.textContent = "\u25B6 Start dance";
+    startBtn.style.cssText = "position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;padding:16px 30px;font:700 19px system-ui,sans-serif;color:#0d1522;background:#f0c060;border:0;border-radius:999px;box-shadow:0 0 0 6px rgba(240,192,96,.25),0 8px 28px rgba(0,0,0,.5);cursor:pointer";
+    document.body.appendChild(startBtn);
+    startBtn.addEventListener("click", () => { if (!player || !player.playVideo) return; if (player.unMute) { player.unMute(); player.setVolume(100); } player.playVideo(); });
+  }
   YTD = { on: false, mode(now) { if (!d.parts) return null; const t = anchor.t + (now - anchor.at) / 1000 * rate; let m = null; for (const [at, what] of d.parts) if (t >= at) m = what; return m; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
   setInterval(() => { if (YTD.on && player && player.getCurrentTime) { const t = player.getCurrentTime(); if (Math.abs(t - (anchor.t + (performance.now() - anchor.at) / 1000 * rate)) > 0.04) anchor = { t, at: performance.now() }; } }, 200);
   // Sparky's own Play button drives the video instead of the click track
@@ -1855,19 +1863,19 @@ var YTD = null;
   window.onYouTubeIframeAPIReady = () => {
     player = new YT.Player("ytPlayer", { width: "100%", height: "100%", videoId: d.id, playerVars: Object.assign({ playsinline: 1, rel: 0, modestbranding: 1, start: q.get("skip") === "1" ? Math.floor(d.start) : 0 }, auto ? { autoplay: 1, mute: 1 } : {}),
       events: { onReady: () => { if (auto) { player.mute(); player.playVideo(); } }, onStateChange: ev => {
-        if (ev.data === 1) { rate = player.getPlaybackRate ? player.getPlaybackRate() : 1; anchor = { t: player.getCurrentTime(), at: performance.now() }; YTD.on = true; stopTrack(); playing = true; playBtn.textContent = "■ Pause"; playBtn.classList.remove("primary"); setStatus("Dancing to " + d.name + "."); }
-        else if (ev.data === 2 || ev.data === 0) { YTD.on = false; stopPlay(); }
+        if (ev.data === 1) { if (startBtn) startBtn.style.display = "none"; rate = player.getPlaybackRate ? player.getPlaybackRate() : 1; anchor = { t: player.getCurrentTime(), at: performance.now() }; YTD.on = true; stopTrack(); playing = true; playBtn.textContent = "■ Pause"; playBtn.classList.remove("primary"); setStatus("Dancing to " + d.name + "."); }
+        else if (ev.data === 2 || ev.data === 0) { YTD.on = false; stopPlay(); if (startBtn && ev.data === 0) startBtn.style.display = ""; }
       } } });
   };
   const tag = document.createElement("script"); tag.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(tag);
-  setStatus(auto ? "Dancing to " + d.name + ". Tap the gold button for sound." : "Test demo loaded: " + d.name + ". Press Play.");
+  setStatus(auto ? "Dancing to " + d.name + ". Tap the gold button for sound." : "Ready: " + d.name + ". Tap Start dance.");
 })();
 })();
 </script>
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v50";
+const APP_VERSION = "sparky-v51";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
