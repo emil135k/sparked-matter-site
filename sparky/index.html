@@ -1397,13 +1397,21 @@ function listenPose(now) {
   return { ...DEF, face: now < L.blinkTill ? "dreamy" : "smile", htn: L.look + shake, hnd: 2 + nod, htl: 5 * Math.sin(ts * 0.4) + L.look * 0.12 };
 }
 
+// Head bob: body still, the head drops on every beat and leans side to side every two, like grooving along before getting up to dance
+function bobPose(now, beats) {
+  if (now > LST.nextBlink) { LST.blinkTill = now + 140; LST.nextBlink = now + rnd(2500, 5500); }
+  const ph = ((beats % 1) + 1) % 1, drop = Math.exp(-ph * 5);                 // a quick dip right on the beat, easing back up
+  return { ...DEF, face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 3 + 14 * drop, htl: 7 * Math.sin(Math.PI * beats / 2), htn: 6 * Math.sin(Math.PI * beats / 4) };
+}
+
 function frame(now) {
   let bounce = 0, p = P, beats = 0;
   if (playing) {
     const useAudio = actx && (metro || beatOn || lvl || trackBuf); if (useAudio) schedule();
     beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; if (YTD && YTD.on) beats = YTD.beats(now); const pos = Math.max(0, beats) * SPB;
-    if (YTD && YTD.on && (beats < 0 || YTD.talking(now))) {       // the talking before the song: body still, only the head listens
-      p = listenPose(now); if (p.face !== shownFace) { shownFace = p.face; drawFace(shownFace); }
+    const ym = YTD && YTD.on ? YTD.mode(now) || (beats < 0 ? "listen" : "dance") : null;
+    if (ym === "listen" || ym === "bob") {    // talking: only the head listens. Singing without the dance: only the head bobs to the beat
+      p = ym === "listen" ? listenPose(now) : bobPose(now, beats); if (p.face !== shownFace) { shownFace = p.face; drawFace(shownFace); }
     } else if (anyPose()) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
     // bounce follows the counting level: once a beat for "1 2 3 4", on every half beat otherwise
     const bf = lvl === 1 ? 2 : 4;
@@ -1782,7 +1790,9 @@ var YTD = null;
 (function () {
   const q = new URLSearchParams(location.search), DEMOS = {
     bambam: { id: "i34pFNr42mc", bpm: 124, start: 0, name: "HUGEL, “Jamaican (Bam Bam)”" },
-    chandler: { id: "o-iJEoTH_4A", bpm: 132, start: 12.845, end: 49.6, tall: true, name: "Crash Adams × Chandler Leighton (street freestyle)" }
+    chandler: { id: "o-iJEoTH_4A", bpm: 132, start: 12.845, tall: true,
+      // measured from the audio. Each part says what Sparky does from that second on: listen to the talking, dance, or bob his head to the beat (body still)
+      parts: [[0, "listen"], [12.845, "dance"], [40.12, "bob"], [41.94, "dance"], [49.6, "bob"]], name: "Crash Adams × Chandler Leighton (street freestyle)" }
   };
   // a time can be given as seconds (72.5) or minutes:seconds (1:12.5)
   const secs = v => { if (v == null || v === "") return null; const p = String(v).split(":").map(Number); const t = p.length > 1 ? p[0] * 60 + p[1] : p[0]; return isFinite(t) ? Math.max(0, t) : null; };
@@ -1838,7 +1848,7 @@ var YTD = null;
     soundBtn.id = "sparkySound"; document.head.appendChild(st); document.body.appendChild(soundBtn);
     soundBtn.addEventListener("click", () => { if (!player || !player.unMute) return; player.unMute(); player.setVolume(100); if (player.getPlayerState() !== 1) player.playVideo(); soundBtn.remove(); });
   }
-  YTD = { on: false, talking(now) { return d.end != null && anchor.t + (now - anchor.at) / 1000 * rate > d.end; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
+  YTD = { on: false, mode(now) { if (!d.parts) return null; const t = anchor.t + (now - anchor.at) / 1000 * rate; let m = null; for (const [at, what] of d.parts) if (t >= at) m = what; return m; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
   setInterval(() => { if (YTD.on && player && player.getCurrentTime) { const t = player.getCurrentTime(); if (Math.abs(t - (anchor.t + (performance.now() - anchor.at) / 1000 * rate)) > 0.04) anchor = { t, at: performance.now() }; } }, 200);
   // Sparky's own Play button drives the video instead of the click track
   playBtn.addEventListener("click", e => { if (!player || !player.getPlayerState) return; e.stopImmediatePropagation(); player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo(); }, true);
@@ -1857,7 +1867,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparky-v49";
+const APP_VERSION = "sparky-v50";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparky-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
