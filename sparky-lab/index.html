@@ -639,6 +639,8 @@ function drawFace(ex) {
   g.lineWidth = 10; g.beginPath();
   if (ex === "laugh") { g.moveTo(90, 150); g.arc(128, 150, 38, Math.PI, 0, true); g.closePath(); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "ooh") { g.arc(128, 172, 18, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
+  else if (ex === "smirkR") { g.moveTo(100, 160); g.bezierCurveTo(122, 170, 144, 166, 160, 146); g.stroke(); }   // listening smirks: mouth closed, both eyes open
+  else if (ex === "smirkL") { g.moveTo(156, 160); g.bezierCurveTo(134, 170, 112, 166, 96, 146); g.stroke(); }
   else if (ex === "smug" || ex === "cool") { g.moveTo(96, 168); g.bezierCurveTo(124, 178, 146, 172, 164, 148); g.stroke(); }
   else if (ex === "wow") { g.ellipse(128, 182, 22, 30, 0, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "dizzy") { g.moveTo(92, 176); g.bezierCurveTo(104, 158, 116, 194, 128, 176); g.bezierCurveTo(140, 158, 152, 194, 164, 176); g.stroke(); }
@@ -1402,8 +1404,8 @@ function listenPose(now) {
   if (d && d.yes) for (const [at, big] of d.yes) { const k = (vt - at) / 0.9; if (k >= 0 && k < 1) yes = big * 16 * Math.sin(Math.PI * 2 * k) ** 2 * Math.sin(Math.PI * k); }
   const drift = 1.5 * Math.sin(ts * 0.9) + 1 * Math.sin(ts * 0.37);                      // tiny life so he's never frozen
   const soft = 2.2 * Math.sin(ts * Math.PI / 1.1) ** 2;                                  // a slight, slow listening nod
-  if (now > (L.nextSmirk || 0)) { L.smirkTill = now + rnd(1200, 2200); L.nextSmirk = now + rnd(4000, 7000); }
-  const face = now < L.blinkTill ? "dreamy" : now < (L.smirkTill || 0) || yes > 3 ? "smug" : "smile";   // mouth stays closed: smile, a side smirk, a blink
+  if (now > (L.nextSmirk || 0)) { L.smirkTill = now + rnd(1400, 2400); L.nextSmirk = now + rnd(3000, 6000); L.smirkSide = L.smirkSide === "smirkR" ? "smirkL" : "smirkR"; }
+  const face = now < L.blinkTill ? "dreamy" : now < (L.smirkTill || 0) ? L.smirkSide : "smile";   // talking part only: mouth closed, a smirk to one side then the other, both eyes blink
   const p = { ...standPose(), face, htn: L.look, hnd: 1 + soft + drift * 0.4 + yes, htl: L.cock + drift };
   if (d && d.ear) {                                                                      // hand up to the ear and back down, gently
     const [a, z] = d.ear, up = glide((vt - a) / 1.2) * (1 - glide((vt - z) / 1.2));
@@ -1431,7 +1433,7 @@ function frame(now) {
     beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; if (YTD && YTD.on) beats = YTD.beats(now); const pos = Math.max(0, beats) * SPB;
     const ym = YTD && YTD.on ? YTD.mode(now) || (beats < 0 ? "listen" : "dance") : null;
     if (ym === "listen" || ym === "bob") p = ym === "listen" ? listenPose(now) : bobPose(now, beats);   // talking: the head listens. Singing without the dance: the head bobs
-    else if (anyPose()) p = poseAt(pos).pose;
+    else if (anyPose()) { const r = poseAt(pos); p = { ...r.pose, face: r.face }; }   // the dance keeps all its own expressions (open mouth, eyes shut, wow...)
     // switching parts (listen, dance, head bob) glides from where he was into the new part over 0.8 s instead of cutting
     if (ym && ym !== BL.mode) { if (BL.mode && BL.last) { BL.from = BL.last; BL.at = now; } BL.mode = ym; }
     BL.k = BL.from ? glide((now - BL.at) / (BL.mode === "dance" ? 1100 : 800)) : 1; if (BL.k >= 1) BL.from = null;
@@ -1908,7 +1910,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparkylab-v5";
+const APP_VERSION = "sparkylab-v6";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparkylab-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
