@@ -1381,28 +1381,30 @@ function refreshLook() {
 }
 document.getElementById("lookBtn").addEventListener("click", () => { plushOn = !plushOn; try { localStorage.setItem("sparky-look", plushOn ? "bear" : "stick"); } catch (e) {} refreshLook(); });
 
-// Listening, for the talking before a song: the body stands still and only the head moves. He looks from one speaker
-// to the other, nods along in little bursts like someone following a conversation, now and then tilts or gives a small
-// "no way" shake, and blinks. It is made up from the clock (not from the sound), so it never repeats exactly.
-const LST = { look: 0, lookTo: -22, nextLook: 0, nextBlink: 0, blinkTill: 0, shakeTill: 0, nextShake: 0 };
+// Listening, for the talking before a song: the body stands still and only the head moves. He looks at whoever is talking
+// (from the demo's transcript timeline when it has one), cocks his head now and then like he's thinking, blinks, and only
+// nods when she answers "yes". Every move eases in and out, so nothing snaps.
+const LST = { look: 0, lookTo: -22, nextLook: 0, nextBlink: 0, blinkTill: 0, cock: 0, cockTo: 0, nextCock: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 function listenPose(now) {
-  const ts = now / 1000, L = LST;
-  if (now > L.nextLook) { L.lookTo = L.lookTo < 0 ? rnd(14, 30) : rnd(-30, -14); if (Math.random() < 0.2) L.lookTo = rnd(-5, 5); L.nextLook = now + rnd(1800, 4200); }
-  L.look += (L.lookTo - L.look) * 0.06;                                                   // eases over to whoever is talking
+  const ts = now / 1000, L = LST, d = YTD && YTD.demo, vt = YTD ? YTD.time(now) : 0;
+  if (d && d.talk) { let side = null; for (const [at, who] of d.talk) if (vt >= at) side = who; L.lookTo = side === "R" ? 24 : side === "L" ? -24 : 0; }
+  else if (now > L.nextLook) { L.lookTo = L.lookTo < 0 ? rnd(14, 30) : rnd(-30, -14); L.nextLook = now + rnd(1800, 4200); }
+  L.look += (L.lookTo - L.look) * 0.08;                                                   // eases over to whoever is talking
+  if (now > L.nextCock) { L.cockTo = Math.random() < 0.4 ? 0 : rnd(-12, 12); L.nextCock = now + rnd(1500, 3500); }
+  L.cock += (L.cockTo - L.cock) * 0.04;                                                   // the thinking head tilt
   if (now > L.nextBlink) { L.blinkTill = now + 140; L.nextBlink = now + rnd(2200, 5000); }
-  if (now > L.nextShake) { L.shakeTill = now + 900; L.nextShake = now + rnd(7000, 12000); }
-  const talk = 0.5 + 0.5 * Math.sin(ts * 1.3) * Math.sin(ts * 0.47 + 1);                  // bursts of nodding, then pauses
-  const nod = 9 * Math.max(0, Math.sin(ts * 2 * Math.PI / 0.62)) * talk;
-  const shake = now < L.shakeTill ? 9 * Math.sin((L.shakeTill - now) / 900 * 3 * 2 * Math.PI) * Math.sin((L.shakeTill - now) / 900 * Math.PI) : 0;
-  return { ...DEF, face: now < L.blinkTill ? "dreamy" : "smile", htn: L.look + shake, hnd: 2 + nod, htl: 5 * Math.sin(ts * 0.4) + L.look * 0.12 };
+  let yes = 0;                                                                            // her "yes": two smooth nods
+  if (d && d.yes) for (const [at, big] of d.yes) { const k = (vt - at) / 0.9; if (k >= 0 && k < 1) yes = big * 16 * Math.sin(Math.PI * 2 * k) ** 2 * Math.sin(Math.PI * k); }
+  const drift = 1.5 * Math.sin(ts * 0.9) + 1 * Math.sin(ts * 0.37);                      // tiny life so he's never frozen
+  return { ...DEF, face: now < L.blinkTill ? "dreamy" : yes > 2 ? "laugh" : "smile", htn: L.look, hnd: 1 + drift * 0.5 + yes, htl: L.cock + drift };
 }
 
 // Head bob: body still, the head drops on every beat and leans side to side every two, like grooving along before getting up to dance
 function bobPose(now, beats) {
   if (now > LST.nextBlink) { LST.blinkTill = now + 140; LST.nextBlink = now + rnd(2500, 5500); }
-  const ph = ((beats % 1) + 1) % 1, drop = Math.exp(-ph * 5);                 // a quick dip right on the beat, easing back up
-  return { ...DEF, face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 3 + 14 * drop, htl: 7 * Math.sin(Math.PI * beats / 2), htn: 6 * Math.sin(Math.PI * beats / 4) };
+  const dip = 0.5 + 0.5 * Math.cos(2 * Math.PI * beats);                      // one smooth wave per beat, lowest right on the beat, no snapping back
+  return { ...DEF, face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 2 + 9 * dip, htl: 5 * Math.sin(Math.PI * beats / 2), htn: 4 * Math.sin(Math.PI * beats / 4) };
 }
 
 function frame(now) {
@@ -1793,7 +1795,10 @@ var YTD = null;
     bambam: { id: "i34pFNr42mc", bpm: 124, start: 0, name: "HUGEL, “Jamaican (Bam Bam)”" },
     chandler: { id: "o-iJEoTH_4A", bpm: 132, start: 12.845, tall: true,
       // measured from the audio. Each part says what Sparky does from that second on: listen to the talking, dance, or bob his head to the beat (body still)
-      parts: [[0, "listen"], [12.845, "dance"], [40.12, "bob"], [41.94, "dance"], [49.6, "bob"]], name: "Crash Adams × Chandler Leighton (street freestyle)" }
+      parts: [[0, "listen"], [12.845, "dance"], [40.12, "bob"], [41.94, "dance"], [49.6, "bob"]],
+      // from the transcript: who is talking (L = Crash Adams asking, R = Chandler answering), and her answers he nods "yes" to (time, how big)
+      talk: [[0, "L"], [2.3, "R"], [3.3, "L"], [4.35, "R"], [4.65, "L"], [5.8, "R"], [6.3, "L"], [7.45, "R"], [8.1, "L"], [11.9, "R"]],
+      yes: [[2.4, 0.5], [4.4, 0.5], [7.5, 0.5], [11.95, 1]], name: "Crash Adams × Chandler Leighton (street freestyle)" }
   };
   // a time can be given as seconds (72.5) or minutes:seconds (1:12.5)
   const secs = v => { if (v == null || v === "") return null; const p = String(v).split(":").map(Number); const t = p.length > 1 ? p[0] * 60 + p[1] : p[0]; return isFinite(t) ? Math.max(0, t) : null; };
@@ -1857,7 +1862,9 @@ var YTD = null;
     document.body.appendChild(startBtn);
     startBtn.addEventListener("click", () => { if (!player || !player.playVideo) return; if (player.unMute) { player.unMute(); player.setVolume(100); } player.playVideo(); });
   }
-  YTD = { on: false, mode(now) { if (!d.parts) return null; const t = anchor.t + (now - anchor.at) / 1000 * rate; let m = null; for (const [at, what] of d.parts) if (t >= at) m = what; return m; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
+  YTD = { on: false, time(now) { return anchor.t + (now - anchor.at) / 1000 * rate; }, demo: d, mode(now) { if (!d.parts) return null; const t = anchor.t + (now - anchor.at) / 1000 * rate; let m = null, from = 0; for (const [at, what] of d.parts) if (t >= at) { m = what; from = at; }
+    if (m === "bob" && (t - from) * bpm() / 60 >= 3) m = "dance";   // three head bobs on the beat, then back to the body dance
+    return m; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
   setInterval(() => { if (YTD.on && player && player.getCurrentTime) { const t = player.getCurrentTime(); if (Math.abs(t - (anchor.t + (performance.now() - anchor.at) / 1000 * rate)) > 0.04) anchor = { t, at: performance.now() }; } }, 200);
   // Sparky's own Play button drives the video instead of the click track
   playBtn.addEventListener("click", e => { if (!player || !player.getPlayerState) return; e.stopImmediatePropagation(); player.getPlayerState() === 1 ? player.pauseVideo() : player.playVideo(); }, true);
@@ -1876,7 +1883,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparkylab-v2";
+const APP_VERSION = "sparkylab-v4";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparkylab-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
