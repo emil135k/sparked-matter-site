@@ -1386,6 +1386,10 @@ document.getElementById("lookBtn").addEventListener("click", () => { plushOn = !
 // nods when she answers "yes". Every move eases in and out, so nothing snaps.
 const LST = { look: 0, lookTo: -22, nextLook: 0, nextBlink: 0, blinkTill: 0, cock: 0, cockTo: 0, nextCock: 0 };
 const rnd = (a, b) => a + Math.random() * (b - a);
+function standPose() {                   // standing still, in the same body build as his dance (so nothing changes shape between parts)
+  const b = { ...DEF }; const s0 = anyPose() ? poseAt(0).pose : null; if (s0) for (const k of BODY) if (k in s0) b[k] = s0[k]; return b;
+}
+const glide = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
 function listenPose(now) {
   const ts = now / 1000, L = LST, d = YTD && YTD.demo, vt = YTD ? YTD.time(now) : 0;
   if (d && d.talk) { let side = null; for (const [at, who] of d.talk) if (vt >= at) side = who; L.lookTo = side === "R" ? 24 : side === "L" ? -24 : 0; }
@@ -1397,15 +1401,28 @@ function listenPose(now) {
   let yes = 0;                                                                            // her "yes": two smooth nods
   if (d && d.yes) for (const [at, big] of d.yes) { const k = (vt - at) / 0.9; if (k >= 0 && k < 1) yes = big * 16 * Math.sin(Math.PI * 2 * k) ** 2 * Math.sin(Math.PI * k); }
   const drift = 1.5 * Math.sin(ts * 0.9) + 1 * Math.sin(ts * 0.37);                      // tiny life so he's never frozen
-  return { ...DEF, face: now < L.blinkTill ? "dreamy" : yes > 2 ? "laugh" : "smile", htn: L.look, hnd: 1 + drift * 0.5 + yes, htl: L.cock + drift };
+  const soft = 2.2 * Math.sin(ts * Math.PI / 1.1) ** 2;                                  // a slight, slow listening nod
+  if (now > (L.nextSmirk || 0)) { L.smirkTill = now + rnd(1200, 2200); L.nextSmirk = now + rnd(4000, 7000); }
+  const face = now < L.blinkTill ? "dreamy" : now < (L.smirkTill || 0) || yes > 3 ? "smug" : "smile";   // mouth stays closed: smile, a side smirk, a blink
+  const p = { ...standPose(), face, htn: L.look, hnd: 1 + soft + drift * 0.4 + yes, htl: L.cock + drift };
+  if (d && d.ear) {                                                                      // hand up to the ear and back down, gently
+    const [a, z] = d.ear, up = glide((vt - a) / 1.2) * (1 - glide((vt - z) / 1.2));
+    if (up > 0) { const E = { aRr: 80, aRb: 150, aRf: 20, aRs: 10, gR: 1, aRt: 80 };
+      for (const k in E) p[k] = p[k] + (E[k] - p[k]) * up; p.htl -= 9 * up; }
+  }
+  return p;
 }
 
 // Head bob: body still, the head drops on every beat and leans side to side every two, like grooving along before getting up to dance
 function bobPose(now, beats) {
   if (now > LST.nextBlink) { LST.blinkTill = now + 140; LST.nextBlink = now + rnd(2500, 5500); }
   const dip = 0.5 + 0.5 * Math.cos(2 * Math.PI * beats);                      // one smooth wave per beat, lowest right on the beat, no snapping back
-  return { ...DEF, face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 2 + 9 * dip, htl: 5 * Math.sin(Math.PI * beats / 2), htn: 4 * Math.sin(Math.PI * beats / 4) };
+  const since = YTD && YTD.since || 0, side = 1 - 2 * glide((since - 2.5) / 1);  // +1 for the first three bobs, sliding over to -1 for the next three
+  return { ...standPose(), face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 2 + 9 * dip, htl: 9 * side, htn: 7 * side };
 }
+
+const BL = { mode: null, from: null, at: 0, k: 1, last: null };
+function mixPose(a, b, k) { const o = { ...b }; for (const key in a) { const x = a[key], y = b[key]; if (typeof x === "number" && typeof y === "number") o[key] = x + (y - x) * k; else if (k < 0.5 && key in a) o[key] = x; } return o; }
 
 function frame(now) {
   let bounce = 0, p = P, beats = 0;
@@ -1413,17 +1430,22 @@ function frame(now) {
     const useAudio = actx && (metro || beatOn || lvl || trackBuf); if (useAudio) schedule();
     beats = useAudio ? nowBeats(now) : (now - t0) / 1000 * bpm() / 60; if (YTD && YTD.on) beats = YTD.beats(now); const pos = Math.max(0, beats) * SPB;
     const ym = YTD && YTD.on ? YTD.mode(now) || (beats < 0 ? "listen" : "dance") : null;
-    if (ym === "listen" || ym === "bob") {    // talking: only the head listens. Singing without the dance: only the head bobs to the beat
-      p = ym === "listen" ? listenPose(now) : bobPose(now, beats); if (p.face !== shownFace) { shownFace = p.face; drawFace(shownFace); }
-    } else if (anyPose()) { const r = poseAt(pos); p = r.pose; if (r.face !== shownFace) { shownFace = r.face; drawFace(shownFace); } }
+    if (ym === "listen" || ym === "bob") p = ym === "listen" ? listenPose(now) : bobPose(now, beats);   // talking: the head listens. Singing without the dance: the head bobs
+    else if (anyPose()) p = poseAt(pos).pose;
+    // switching parts (listen, dance, head bob) glides from where he was into the new part over 0.8 s instead of cutting
+    if (ym && ym !== BL.mode) { if (BL.mode && BL.last) { BL.from = BL.last; BL.at = now; } BL.mode = ym; }
+    BL.k = BL.from ? glide((now - BL.at) / (BL.mode === "dance" ? 1100 : 800)) : 1; if (BL.k >= 1) BL.from = null;
+    if (BL.from) p = mixPose(BL.from, p, BL.k);
+    BL.last = p; if (p.face !== shownFace) { shownFace = p.face; drawFace(shownFace); }
     // bounce follows the counting level: once a beat for "1 2 3 4", on every half beat otherwise
     const bf = lvl === 1 ? 2 : 4;
-    if (groove && beats >= 0) bounce = 0.025 * (0.5 + 0.5 * Math.cos(bf * Math.PI * beats)) ** 2;
+    if (groove && beats >= 0 && (!BL.mode || BL.mode === "dance")) bounce = BL.k * 0.025 * (0.5 + 0.5 * Math.cos(bf * Math.PI * beats)) ** 2;
     const ti = Math.floor(beats); if (!useAudio && ti !== lastTick) { lastTick = ti; if (metro) tick(ti % 8 === 0); }
     paintSlots(beats < 0 ? -1 : Math.floor(pos) % (pages.length * SLOT_N)); document.getElementById("countNow").textContent = (((Math.floor(beats) % 8) + 8) % 8) + 1 + (beats >= 0 && Math.floor(pos) % SPB ? " " + SUBS[Math.floor(pos) % SPB] : "");
     showCoach(beats);
     rings.forEach((r, i) => { const ph = (((beats - i * 0.33) % 1) + 1) % 1; r.scale.setScalar(0.25 + ph * 1.2); r.material.opacity = 0.5 * (1 - ph); });
   } else {
+    BL.mode = null; BL.from = null; BL.last = null;
     if (P.face !== shownFace) { shownFace = P.face; drawFace(shownFace); }
     rings.forEach(r => r.material.opacity = 0);
     document.getElementById("countNow").textContent = (Math.floor(sel / SPB) + 1) + (sel % SPB ? " " + SUBS[sel % SPB] : "");
@@ -1795,10 +1817,12 @@ var YTD = null;
     bambam: { id: "i34pFNr42mc", bpm: 124, start: 0, name: "HUGEL, “Jamaican (Bam Bam)”" },
     chandler: { id: "o-iJEoTH_4A", bpm: 132, start: 12.845, tall: true,
       // measured from the audio. Each part says what Sparky does from that second on: listen to the talking, dance, or bob his head to the beat (body still)
-      parts: [[0, "listen"], [12.845, "dance"], [40.12, "bob"], [41.94, "dance"], [49.6, "bob"]],
+      parts: [[0, "listen"], [12.845, "dance"], [40.12, "bob"], [49.6, "bob"]],   // each head bob runs six beats, then he dances
       // from the transcript: who is talking (L = Crash Adams asking, R = Chandler answering), and her answers he nods "yes" to (time, how big)
       talk: [[0, "L"], [2.3, "R"], [3.3, "L"], [4.35, "R"], [4.65, "L"], [5.8, "R"], [6.3, "L"], [7.45, "R"], [8.1, "L"], [11.9, "R"]],
-      yes: [[2.4, 0.5], [4.4, 0.5], [7.5, 0.5], [11.95, 1]], name: "Crash Adams × Chandler Leighton (street freestyle)" }
+      yes: [[2.4, 0.35], [4.4, 0.35], [7.5, 0.35], [11.95, 1]],
+      ear: [4.7, 7.6],   // he cups a hand to his ear from her name until "a little bit", then lowers it
+      name: "Crash Adams × Chandler Leighton (street freestyle)" }
   };
   // a time can be given as seconds (72.5) or minutes:seconds (1:12.5)
   const secs = v => { if (v == null || v === "") return null; const p = String(v).split(":").map(Number); const t = p.length > 1 ? p[0] * 60 + p[1] : p[0]; return isFinite(t) ? Math.max(0, t) : null; };
@@ -1863,7 +1887,8 @@ var YTD = null;
     startBtn.addEventListener("click", () => { if (!player || !player.playVideo) return; if (player.unMute) { player.unMute(); player.setVolume(100); } player.playVideo(); });
   }
   YTD = { on: false, time(now) { return anchor.t + (now - anchor.at) / 1000 * rate; }, demo: d, mode(now) { if (!d.parts) return null; const t = anchor.t + (now - anchor.at) / 1000 * rate; let m = null, from = 0; for (const [at, what] of d.parts) if (t >= at) { m = what; from = at; }
-    if (m === "bob" && (t - from) * bpm() / 60 >= 3) m = "dance";   // three head bobs on the beat, then back to the body dance
+    this.since = (t - from) * bpm() / 60;
+    if (m === "bob" && this.since >= 6) m = "dance";   // three head bobs leaning one way, three the other, then back to the body dance
     return m; }, beats(now) { const t = anchor.t + (now - anchor.at) / 1000 * rate; return (t - d.start - offset) * bpm() / 60; } };
   setInterval(() => { if (YTD.on && player && player.getCurrentTime) { const t = player.getCurrentTime(); if (Math.abs(t - (anchor.t + (performance.now() - anchor.at) / 1000 * rate)) > 0.04) anchor = { t, at: performance.now() }; } }, 200);
   // Sparky's own Play button drives the video instead of the click track
@@ -1883,7 +1908,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparkylab-v4";
+const APP_VERSION = "sparkylab-v5";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparkylab-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
