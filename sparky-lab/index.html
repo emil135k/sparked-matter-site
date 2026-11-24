@@ -622,7 +622,7 @@ function drawFace(ex) {
   eyes.forEach(([x, y], i) => {
     g.beginPath();
     if (ex === "love") { g.fillStyle = C; heart(g, x, y, 20); g.fillStyle = W; }
-    else if (ex === "dreamy" || (ex === "smug" && i === 1)) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+    else if (ex === "dreamy" || (ex === "smug" && i === 1) || (ex === "smugL" && i === 0)) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
     else if (ex === "laugh") { g.moveTo(x - 16, y + 6); g.lineTo(x, y - 10); g.lineTo(x + 16, y + 6); g.stroke(); }
     else if (ex === "wink" && i === 1) { g.arc(x, y - 6, 16, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
     else if (ex === "wow") { g.arc(x, y, 21, 0, Math.PI * 2); g.fill(); g.fillStyle = plushOn ? "#fff" : "#2a1418"; g.beginPath(); g.arc(x - (plushOn ? 6 : 0), y + (plushOn ? -6 : 2), plushOn ? 6 : 8, 0, Math.PI * 2); g.fill(); g.fillStyle = W; }
@@ -634,13 +634,14 @@ function drawFace(ex) {
   if (ex === "cool") { g.fillStyle = "#0b0f18"; g.strokeStyle = W; g.lineWidth = 6;
     eyes.forEach(([x, y]) => { g.beginPath(); g.moveTo(x - 30, y - 16); g.lineTo(x + 30, y - 16); g.lineTo(x + 24, y + 12); g.quadraticCurveTo(x, y + 26, x - 24, y + 12); g.closePath(); g.fill(); g.stroke(); });
     g.beginPath(); g.moveTo(122, 96); g.lineTo(134, 96); g.stroke(); g.fillStyle = W; g.lineWidth = 8; }
-  eyes.forEach(([x, y], i) => { if (ex === "cool") return; const lift = (ex === "smug" && i === 1) ? -14 : ex === "ooh" ? -10 : (ex === "wow" || ex === "dizzy") ? -20 : (ex === "wink" && i === 0) ? -8 : 0; const tl = ex === "focus" ? (i ? 8 : -8) : 0;
+  eyes.forEach(([x, y], i) => { if (ex === "cool") return; const lift = (ex === "smug" && i === 1) || (ex === "smugL" && i === 0) ? -14 : ex === "ooh" ? -10 : (ex === "wow" || ex === "dizzy") ? -20 : (ex === "wink" && i === 0) ? -8 : 0; const tl = ex === "focus" ? (i ? 8 : -8) : 0;
     g.beginPath(); g.moveTo(x - 18, y - 40 + lift - tl); g.lineTo(x + 18, y - 40 + lift + tl); g.stroke(); });
   g.lineWidth = 10; g.beginPath();
   if (ex === "laugh") { g.moveTo(90, 150); g.arc(128, 150, 38, Math.PI, 0, true); g.closePath(); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "ooh") { g.arc(128, 172, 18, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "smirkR") { g.moveTo(100, 160); g.bezierCurveTo(122, 170, 144, 166, 160, 146); g.stroke(); }   // listening smirks: mouth closed, both eyes open
   else if (ex === "smirkL") { g.moveTo(156, 160); g.bezierCurveTo(134, 170, 112, 166, 96, 146); g.stroke(); }
+  else if (ex === "smugL") { g.moveTo(160, 168); g.bezierCurveTo(132, 178, 110, 172, 92, 148); g.stroke(); }   // smug, mirrored: the other eye closed
   else if (ex === "smug" || ex === "cool") { g.moveTo(96, 168); g.bezierCurveTo(124, 178, 146, 172, 164, 148); g.stroke(); }
   else if (ex === "wow") { g.ellipse(128, 182, 22, 30, 0, 0, Math.PI * 2); g.fillStyle = "#3a0d14"; g.fill(); g.stroke(); }
   else if (ex === "dizzy") { g.moveTo(92, 176); g.bezierCurveTo(104, 158, 116, 194, 128, 176); g.bezierCurveTo(140, 158, 152, 194, 164, 176); g.stroke(); }
@@ -1420,7 +1421,7 @@ function bobPose(now, beats) {
   if (now > LST.nextBlink) { LST.blinkTill = now + 140; LST.nextBlink = now + rnd(2500, 5500); }
   const dip = 0.5 + 0.5 * Math.cos(2 * Math.PI * beats);                      // one smooth wave per beat, lowest right on the beat, no snapping back
   const since = YTD && YTD.since || 0, side = 1 - 2 * glide((since - 2.5) / 1);  // +1 for the first three bobs, sliding over to -1 for the next three
-  return { ...standPose(), face: now < LST.blinkTill ? "dreamy" : "smug", hnd: 2 + 9 * dip, htl: 9 * side, htn: 7 * side };
+  return { ...standPose(), face: side > 0 ? "smug" : "smugL", hnd: 2 + 9 * dip, htl: 9 * side, htn: 7 * side };   // one eye closed for three bobs, the other eye for the next three
 }
 
 const BL = { mode: null, from: null, at: 0, k: 1, last: null };
@@ -1910,7 +1911,7 @@ var YTD = null;
 
 <script>
 // offline support and updates. APP_VERSION is the version this page was built as; the service worker file carries the newest one.
-const APP_VERSION = "sparkylab-v6";
+const APP_VERSION = "sparkylab-v7";
 (() => {
   const tag = document.createElement("div"); tag.id = "appVersion"; tag.textContent = "Version " + APP_VERSION.replace("sparkylab-v", "");
   tag.style.cssText = "text-align:center;color:#8796ab;font-size:12px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px))"; document.body.appendChild(tag);
